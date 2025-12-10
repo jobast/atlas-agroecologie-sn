@@ -1,0 +1,5 @@
+@import "leaflet-fullscreen/dist/leaflet.fullscreen.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
