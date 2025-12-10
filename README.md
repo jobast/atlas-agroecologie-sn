@@ -156,3 +156,4 @@ GeoCollect_v2/
 ```
 dytael.bignona@gmail.com
 Bignona2025
+Atlas de l’Agroécologie – version de travail
