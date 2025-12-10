@@ -1,7 +1,14 @@
-require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors'); // Middleware officiel
-const path = require('path');
+
+const envProdPath = path.resolve(__dirname, '.env.production');
+const envDefaultPath = path.resolve(__dirname, '.env');
+const envPath = process.env.NODE_ENV === 'production' && fs.existsSync(envProdPath)
+  ? envProdPath
+  : (fs.existsSync(envDefaultPath) ? envDefaultPath : envProdPath);
+require('dotenv').config({ path: envPath });
 
 const app = express(); // DOIT être avant app.use
 // redeploy trigger
@@ -43,6 +50,15 @@ app.use('/api/auth', auth);
 app.use('/api/data', data);
 app.use('/api/users', users);
 app.use('/api/custom-fields', customFields);
+
+const distPath = path.resolve(__dirname, '../client/dist');
+const shouldServeFrontend = process.env.SERVE_FRONTEND !== 'false';
+if (shouldServeFrontend && fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 const PORT = process.env.PORT || 5050;
 app.listen(PORT, () => {

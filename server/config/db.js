@@ -1,5 +1,14 @@
+const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
 const mysql = require('mysql2/promise');
-require('dotenv').config();
+
+const envProdPath = path.resolve(__dirname, '../.env.production');
+const envDefaultPath = path.resolve(__dirname, '../.env');
+const envPath = process.env.NODE_ENV === 'production' && fs.existsSync(envProdPath)
+  ? envProdPath
+  : (fs.existsSync(envDefaultPath) ? envDefaultPath : envProdPath);
+dotenv.config({ path: envPath });
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
@@ -13,5 +22,3 @@ const pool = mysql.createPool({
 });
 
 module.exports = pool;
-
-

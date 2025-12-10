@@ -154,6 +154,10 @@ GeoCollect_v2/
 ├── start-geocollect.sh
 └── README.md
 ```
-dytael.bignona@gmail.com
-Bignona2025
-Atlas de l’Agroécologie – version de travail
+
+## 🚀 Deployment (Infomaniak)
+
+- `npm install` (root) installe les dépendances du backend et du frontend puis construit le frontend dans `client/dist`.
+- `npm start` lance l’API Express (port `process.env.PORT` ou 5050) et sert le build Vite depuis `client/dist`.
+- Variables à renseigner avant déploiement : `server/.env.production` (DB, JWT, SMTP, FRONTEND_URL/PUBLIC_FILES_URL) et `client/.env.production` (`VITE_API_URL`).
+- En local, pour une exécution prod-like : `npm start` après avoir rempli les `.env.production` ou `.env`. Pour le développement, continuer à utiliser `npm run dev --prefix server` et `npm run dev --prefix client` ou le script `start-geocollect.sh`.

@@ -1,4 +1,13 @@
-require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
+
+const envProdPath = path.resolve(__dirname, '.env.production');
+const envDefaultPath = path.resolve(__dirname, '.env');
+const envPath = process.env.NODE_ENV === 'production' && fs.existsSync(envProdPath)
+  ? envProdPath
+  : (fs.existsSync(envDefaultPath) ? envDefaultPath : envProdPath);
+dotenv.config({ path: envPath });
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
