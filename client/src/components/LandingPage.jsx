@@ -43,12 +43,9 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow p-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">GeoCollect</h1>
-      </nav>
-
       <div className="max-w-3xl mx-auto text-center mt-12 px-4">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Bienvenue !</h2>
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">Atlas des initiatives agroécologiques</h1>
+        <h2 className="text-lg font-semibold text-gray-700 mb-4">Bienvenue !</h2>
         <p className="text-gray-700">
           Cet outil de cartographie permet d’identifier, visualiser et valoriser les acteurs et initiatives
           agroécologiques du département de Bignona. Il a été conçu par la DYTAEL de Bignona.

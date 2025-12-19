@@ -155,6 +155,7 @@ export default function CartoModule() {
             basemap={basemap}
             setBasemap={setBasemap}
             focusPoint={focusPoint}
+            activeActivities={filters.activities}
           />
         )}
         {error && <div className="absolute inset-0 flex items-center justify-center text-red-600 bg-white/80">{error}</div>}

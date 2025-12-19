@@ -9,6 +9,14 @@ export default function Filters({ filters, setFilters, activities = [], actors =
     });
   };
 
+  const formatActivityLabel = (value) => {
+    if (!value) return '';
+    const lower = value.toLowerCase();
+    if (lower === 'other') return 'Autres';
+    const withoutUnderscore = value.replace(/_/g, ' ');
+    return withoutUnderscore.charAt(0).toUpperCase() + withoutUnderscore.slice(1);
+  };
+
   return (
     <div className="space-y-4 text-sm">
       <div>
@@ -21,7 +29,7 @@ export default function Filters({ filters, setFilters, activities = [], actors =
               onClick={() => toggleActivity(a)}
               className={`px-2 py-1 rounded border ${filters.activities.includes(a) ? 'bg-green-100 border-green-400 text-green-800' : 'border-gray-200'}`}
             >
-              {a}
+              {formatActivityLabel(a)}
             </button>
           ))}
         </div>

@@ -16,7 +16,7 @@ export default function AdminDashboard() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filterStatus, setFilterStatus] = useState('pending');
+  const [filterStatus, setFilterStatus] = useState('all'); // affiche tout par défaut
   const [sortBy, setSortBy] = useState('newest');
   const [selectedIds, setSelectedIds] = useState([]);
   const [detailItem, setDetailItem] = useState(null);

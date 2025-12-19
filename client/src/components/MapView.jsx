@@ -2,26 +2,26 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Popup, CircleMarker, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
+const initialBounds = [
+  [12.45, -16.78], // South-West
+  [13.23, -15.70]  // North-East
+];
+
+const baseGreen = '#16a34a';
+
 const colorForActivity = (a) => {
-  if (!a) return '#9CA3AF';
+  if (!a) return baseGreen;
   const key = a.toLowerCase();
   if (key.includes('production')) return '#22c55e';
   if (key.includes('transformation')) return '#f97316';
   if (key.includes('formation')) return '#3b82f6';
   if (key.includes('gouver')) return '#8b5cf6';
   if (key.includes('commerce')) return '#facc15';
-  return '#9CA3AF';
+  return baseGreen;
 };
 
 function FitBounds({ points }) {
-  const map = useMap();
-  useEffect(() => {
-    const coords = points.filter(p => p.lat && p.lon);
-    if (coords.length === 0) return;
-    const latLngs = coords.map(p => [p.lat, p.lon]);
-    map.fitBounds(latLngs, { padding: [40, 40] });
-  }, [points, map]);
-  return null;
+  return null; // désactivé pour conserver l'emprise par défaut
 }
 
 function Recenter({ points, selectedId, focusPoint }) {
@@ -38,17 +38,23 @@ function Recenter({ points, selectedId, focusPoint }) {
   return null;
 }
 
-export default function MapView({ points = [], selectedId, onSelect, basemap, setBasemap, focusPoint }) {
+export default function MapView({ points = [], selectedId, onSelect, basemap, setBasemap, focusPoint, activeActivities = [] }) {
   const mapRef = useRef();
   const [localBasemap, setLocalBasemap] = useState(basemap || 'streets');
   const currentBasemap = basemap || localBasemap;
   const updateBasemap = setBasemap || setLocalBasemap;
 
+  useEffect(() => {
+    if (mapRef.current) {
+      mapRef.current.fitBounds(initialBounds, { padding: [10, 10] });
+    }
+  }, []);
+
   return (
     <MapContainer
       whenCreated={(map) => { mapRef.current = map; }}
-      center={[14.5, -17.5]}
-      zoom={7}
+      center={[12.84, -16.24]}
+      zoom={10}
       className="h-full w-full"
     >
       {currentBasemap === 'streets' && (
@@ -89,14 +95,15 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
         .filter(pt => pt.lat && pt.lon)
         .map(pt => {
           const mainAct = (pt.activities && pt.activities[0]) || '';
-          const color = colorForActivity(mainAct);
+          const useActivityPalette = (activeActivities || []).length > 0;
+          const color = useActivityPalette ? colorForActivity(mainAct) : baseGreen;
           const isSelected = pt.id === selectedId;
           return (
             <CircleMarker
               key={pt.id}
               center={[parseFloat(pt.lat), parseFloat(pt.lon)]}
               radius={isSelected ? 10 : 7}
-              pathOptions={{ color, weight: isSelected ? 3 : 1, fillOpacity: 0.8 }}
+              pathOptions={{ color, fillColor: color, weight: isSelected ? 3 : 1, fillOpacity: 0.8 }}
               eventHandlers={{ click: () => onSelect?.(pt.id, pt) }}
             >
             </CircleMarker>
