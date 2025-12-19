@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Popup, CircleMarker, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Marker } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const initialBounds = [
@@ -32,7 +34,8 @@ function Recenter({ points, selectedId, focusPoint }) {
     const lat = parseFloat(target.lat);
     const lon = parseFloat(target.lon);
     if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-      map.flyTo([lat, lon], 11, { duration: 0.5 });
+      const currentZoom = map.getZoom() || 10;
+      map.flyTo([lat, lon], currentZoom, { duration: 0.5 });
     }
   }, [points, selectedId, focusPoint, map]);
   return null;
@@ -44,15 +47,12 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
   const currentBasemap = basemap || localBasemap;
   const updateBasemap = setBasemap || setLocalBasemap;
 
-  useEffect(() => {
-    if (mapRef.current) {
-      mapRef.current.fitBounds(initialBounds, { padding: [10, 10] });
-    }
-  }, []);
-
   return (
     <MapContainer
-      whenCreated={(map) => { mapRef.current = map; }}
+      whenCreated={(map) => {
+        mapRef.current = map;
+        map.setView([12.84, -16.24], 10);
+      }}
       center={[12.84, -16.24]}
       zoom={10}
       className="h-full w-full"
@@ -91,24 +91,47 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
       </div>
       <FitBounds points={points} />
       <Recenter points={points} selectedId={selectedId} focusPoint={focusPoint} />
-      {points
-        .filter(pt => pt.lat && pt.lon)
-        .map(pt => {
-          const mainAct = (pt.activities && pt.activities[0]) || '';
-          const useActivityPalette = (activeActivities || []).length > 0;
-          const color = useActivityPalette ? colorForActivity(mainAct) : baseGreen;
-          const isSelected = pt.id === selectedId;
-          return (
-            <CircleMarker
-              key={pt.id}
-              center={[parseFloat(pt.lat), parseFloat(pt.lon)]}
-              radius={isSelected ? 10 : 7}
-              pathOptions={{ color, fillColor: color, weight: isSelected ? 3 : 1, fillOpacity: 0.8 }}
-              eventHandlers={{ click: () => onSelect?.(pt.id, pt) }}
-            >
-            </CircleMarker>
-          );
-        })}
+      <MarkerClusterGroup
+        chunkedLoading
+        spiderfyOnMaxZoom
+        showCoverageOnHover={false}
+        zoomToBoundsOnClick
+        maxClusterRadius={(z) => (z <= 7 ? 80 : z <= 9 ? 60 : z <= 11 ? 40 : 20)}
+        iconCreateFunction={(cluster) => {
+          const count = cluster.getChildCount();
+          const size = count < 10 ? 32 : count < 50 ? 40 : 48;
+          return L.divIcon({
+            html: `<div style="background:#065f46;color:white;border:2px solid white;border-radius:9999px;width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">${count}</div>`,
+            className: 'cluster-icon'
+          });
+        }}
+      >
+        {points
+          .map(pt => ({
+            ...pt,
+            latNum: parseFloat(pt.lat),
+            lonNum: parseFloat(pt.lon)
+          }))
+          .filter(pt => !Number.isNaN(pt.latNum) && !Number.isNaN(pt.lonNum))
+          .map((pt) => {
+            const mainAct = (pt.activities && pt.activities[0]) || '';
+            const useActivityPalette = (activeActivities || []).length > 0;
+            const color = useActivityPalette ? colorForActivity(mainAct) : baseGreen;
+            const isSelected = pt.id === selectedId;
+            const icon = L.divIcon({
+              html: `<div style="background:${color};width:${isSelected ? 18 : 14}px;height:${isSelected ? 18 : 14}px;border:2px solid white;border-radius:9999px;"></div>`,
+              className: ''
+            });
+            return (
+              <Marker
+                key={pt.id}
+                position={[pt.latNum, pt.lonNum]}
+                icon={icon}
+                eventHandlers={{ click: () => onSelect?.(pt.id, pt) }}
+              />
+            );
+          })}
+      </MarkerClusterGroup>
     </MapContainer>
   );
 }

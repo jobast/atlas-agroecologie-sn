@@ -22,7 +22,7 @@ import Footer from './components/Footer';
 function App() {
   return (
     <Router>
-      <div className="pb-20">
+      <div className="pb-16 pt-16">
         <Navbar />
         <Routes>
           <Route path="/" element={<LandingPage />} />

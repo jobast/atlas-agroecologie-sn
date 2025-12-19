@@ -72,7 +72,7 @@ export default function Navbar() {
   );
 
   return (
-    <nav className="bg-emerald-800 text-white shadow p-4 flex justify-between items-center">
+    <nav className="bg-emerald-800 text-white shadow p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-50">
       <div className="flex items-center gap-6">
         <Link to="/" className="text-xl font-bold text-white hover:text-emerald-100 transition-colors mr-6">
           Atlas des initiatives agroécologiques

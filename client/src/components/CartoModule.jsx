@@ -118,11 +118,16 @@ export default function CartoModule() {
   const stats = useMemo(() => {
     const total = filtered.length;
     const actors = {};
+    const activities = {};
     filtered.forEach(pt => {
       const a = pt.actor_type || 'Non renseigné';
       actors[a] = (actors[a] || 0) + 1;
+      (pt.activities || []).forEach(act => {
+        const label = act || 'Non renseigné';
+        activities[label] = (activities[label] || 0) + 1;
+      });
     });
-    return { total, actors };
+    return { total, actors, activities };
   }, [filtered]);
 
   return (
