@@ -51,11 +51,25 @@ app.use('/api/data', data);
 app.use('/api/users', users);
 app.use('/api/custom-fields', customFields);
 
+app.get('/api/version', (req, res) => {
+  res.json({
+    commit: process.env.SOURCE_VERSION || process.env.VERCEL_GIT_COMMIT_SHA || null,
+    nodeEnv: process.env.NODE_ENV || null,
+  });
+});
+
 const distPath = path.resolve(__dirname, '../client/dist');
 const shouldServeFrontend = process.env.SERVE_FRONTEND !== 'false';
 if (shouldServeFrontend && fs.existsSync(distPath)) {
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-store');
+      }
+    }
+  }));
   app.get('*', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
