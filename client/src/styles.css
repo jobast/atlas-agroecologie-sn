@@ -3,3 +3,20 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.carto-viewport {
+  height: calc(100vh - 4rem);
+  height: calc(100svh - 4rem);
+}
+
+.carto-explorer {
+  bottom: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  .carto-viewport {
+    height: calc(100vh - 8rem);
+    height: calc(100svh - 8rem);
+  }
+}

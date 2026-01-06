@@ -133,7 +133,7 @@ export default function CartoModule() {
   }, [filtered]);
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-8rem)] bg-gray-50">
+    <div className="flex flex-col md:flex-row carto-viewport bg-gray-50">
       <div className="order-1 md:order-2 flex-1 relative z-0 md:pr-96">
         {loading && <div className="absolute inset-0 flex items-center justify-center bg-white/60">Chargement…</div>}
         {!loading && !error && (
@@ -156,7 +156,7 @@ export default function CartoModule() {
         <button
           type="button"
           onClick={() => { setMobilePanelOpen(true); setMobileTab('list'); }}
-          className="md:hidden absolute bottom-4 left-4 z-[600] px-4 py-2 rounded-full bg-emerald-700 text-white shadow hover:bg-emerald-800 active:bg-emerald-900"
+          className="md:hidden absolute left-4 z-[600] px-4 py-2 rounded-full bg-emerald-700 text-white shadow hover:bg-emerald-800 active:bg-emerald-900 carto-explorer"
         >
           Explorer
         </button>

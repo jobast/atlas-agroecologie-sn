@@ -26,6 +26,23 @@ function FitBounds({ points }) {
   return null; // désactivé pour conserver l'emprise par défaut
 }
 
+function FullExtentControl({ className = '' }) {
+  const map = useMap();
+  return (
+    <button
+      type="button"
+      aria-label="Vue globale"
+      title="Vue globale"
+      onClick={() => map.fitBounds(initialBounds, { padding: [20, 20] })}
+      className={`bg-white rounded shadow border border-gray-200 text-gray-700 hover:bg-gray-50 active:bg-gray-100 w-9 h-9 flex items-center justify-center ${className}`}
+    >
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 8V4h4M4 4l6 6M20 8V4h-4M20 4l-6 6M4 16v4h4M4 20l6-6M20 16v4h-4M20 20l-6-6" />
+      </svg>
+    </button>
+  );
+}
+
 function Recenter({ points, selectedId, focusPoint }) {
   const map = useMap();
   useEffect(() => {
@@ -47,6 +64,12 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
   const [localBasemap, setLocalBasemap] = useState(basemap || 'streets');
   const currentBasemap = basemap || localBasemap;
   const updateBasemap = setBasemap || setLocalBasemap;
+  const basemapOrder = ['streets', 'satellite', 'terrain'];
+  const basemapLabel = {
+    streets: 'OSM',
+    satellite: 'Satellite',
+    terrain: 'Relief'
+  };
 
   return (
     <MapContainer
@@ -78,17 +101,25 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
         />
       )}
       <div className="leaflet-top leaflet-right z-[1000] pointer-events-auto">
-        <div className="m-2 bg-white rounded shadow p-2 text-sm flex items-center gap-2">
-          <label className="text-xs text-gray-600">Fond</label>
-          <select
-            value={currentBasemap}
-            onChange={(e) => updateBasemap(e.target.value)}
-            className="border rounded px-2 py-1"
+        <div className="m-2 flex flex-col gap-2 items-end">
+          <button
+            type="button"
+            aria-label={`Fond: ${basemapLabel[currentBasemap]}`}
+            title={`Fond: ${basemapLabel[currentBasemap]}`}
+            onClick={() => {
+              const idx = basemapOrder.indexOf(currentBasemap);
+              const next = basemapOrder[(idx + 1) % basemapOrder.length];
+              updateBasemap(next);
+            }}
+            className="bg-white rounded shadow border border-gray-200 text-gray-700 hover:bg-gray-50 active:bg-gray-100 w-9 h-9 flex items-center justify-center"
           >
-            <option value="streets">OSM</option>
-            <option value="satellite">Satellite</option>
-            <option value="terrain">Relief</option>
-          </select>
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3l8 4-8 4-8-4 8-4z" />
+              <path d="M4 11l8 4 8-4" />
+              <path d="M4 15l8 4 8-4" />
+            </svg>
+          </button>
+          <FullExtentControl />
         </div>
       </div>
       <FitBounds points={points} />
