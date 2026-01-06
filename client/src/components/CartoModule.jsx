@@ -34,6 +34,8 @@ export default function CartoModule() {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [focusPoint, setFocusPoint] = useState(null);
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState('list');
   const [filters, setFilters] = useState({
     activities: [],
     actor: '',
@@ -131,10 +133,38 @@ export default function CartoModule() {
   }, [filtered]);
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-gray-50">
-      <div className="w-full md:w-96 border-r bg-white flex flex-col">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-8rem)] bg-gray-50">
+      <div className="order-1 md:order-2 flex-1 relative z-0 md:pr-96">
+        {loading && <div className="absolute inset-0 flex items-center justify-center bg-white/60">Chargement…</div>}
+        {!loading && !error && (
+          <MapView
+            points={filtered}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            basemap={basemap}
+            setBasemap={setBasemap}
+            focusPoint={focusPoint}
+            activeActivities={filters.activities}
+          />
+        )}
+        {error && <div className="absolute inset-0 flex items-center justify-center text-red-600 bg-white/80">{error}</div>}
+
+        <div className="hidden md:block">
+          <Sidebar stats={stats} variant="overlay" />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => { setMobilePanelOpen(true); setMobileTab('list'); }}
+          className="md:hidden absolute bottom-4 left-4 z-[600] px-4 py-2 rounded-full bg-emerald-700 text-white shadow hover:bg-emerald-800 active:bg-emerald-900"
+        >
+          Explorer
+        </button>
+      </div>
+
+      <div className="order-2 md:order-1 hidden md:flex w-full md:w-96 border-r bg-white flex-col">
         <div className="p-4 border-b">
-          <SearchBar value={search} onChange={setSearch} suggestions={filtered.slice(0,5)} onSelect={onSelect} />
+          <SearchBar value={search} onChange={setSearch} suggestions={filtered.slice(0, 5)} onSelect={onSelect} />
         </div>
         <div className="p-4 border-b">
           <Filters
@@ -150,28 +180,75 @@ export default function CartoModule() {
         </div>
       </div>
 
-      <div className="flex-1 relative z-0 md:pr-96">
-        {loading && <div className="absolute inset-0 flex items-center justify-center bg-white/60">Chargement…</div>}
-        {!loading && !error && (
-          <MapView
-            points={filtered}
-            selectedId={selectedId}
-            onSelect={onSelect}
-            basemap={basemap}
-            setBasemap={setBasemap}
-            focusPoint={focusPoint}
-            activeActivities={filters.activities}
+      {mobilePanelOpen && (
+        <div className="md:hidden fixed inset-0 z-[700]">
+          <button
+            type="button"
+            aria-label="Fermer"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobilePanelOpen(false)}
           />
-        )}
-        {error && <div className="absolute inset-0 flex items-center justify-center text-red-600 bg-white/80">{error}</div>}
-
-        <Sidebar
-          item={selected}
-          stats={stats}
-          onClose={() => setSelectedId(null)}
-          onFocusMap={() => selected && onSelect(selected.id)}
-        />
-      </div>
+          <div className="absolute left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-xl max-h-[80vh] flex flex-col">
+            <div className="p-3 border-b flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMobileTab('list')}
+                  className={`px-3 py-1 rounded-full text-sm border ${mobileTab === 'list' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'border-gray-200 text-gray-700'}`}
+                >
+                  Liste
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileTab('filters')}
+                  className={`px-3 py-1 rounded-full text-sm border ${mobileTab === 'filters' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'border-gray-200 text-gray-700'}`}
+                >
+                  Filtres
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileTab('stats')}
+                  className={`px-3 py-1 rounded-full text-sm border ${mobileTab === 'stats' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'border-gray-200 text-gray-700'}`}
+                >
+                  Stats
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobilePanelOpen(false)}
+                className="px-3 py-1 rounded border border-gray-200 text-gray-700"
+              >
+                Fermer
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto">
+              {mobileTab === 'list' && (
+                <div className="space-y-4">
+                  <SearchBar value={search} onChange={setSearch} suggestions={filtered.slice(0, 5)} onSelect={(id, pt) => { onSelect(id, pt); setMobilePanelOpen(false); }} />
+                  <ListView items={filtered} onSelect={(id, pt) => { onSelect(id, pt); setMobilePanelOpen(false); }} selectedId={selectedId} />
+                </div>
+              )}
+              {mobileTab === 'filters' && (
+                <div className="space-y-4">
+                  <SearchBar value={search} onChange={setSearch} suggestions={filtered.slice(0, 5)} onSelect={(id, pt) => { onSelect(id, pt); setMobilePanelOpen(false); }} />
+                  <Filters
+                    filters={filters}
+                    setFilters={setFilters}
+                    activities={uniqueActivities}
+                    actors={uniqueActors}
+                    communes={uniqueCommunes}
+                  />
+                </div>
+              )}
+              {mobileTab === 'stats' && (
+                <div className="space-y-3">
+                  <Sidebar stats={stats} variant="embedded" />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

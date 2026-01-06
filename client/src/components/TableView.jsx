@@ -99,7 +99,7 @@ export default function TableView() {
                 {columns.map(col => (
                   <th
                     key={col.key}
-                    className="px-4 py-3 cursor-pointer select-none align-top"
+                    className={`px-4 py-3 cursor-pointer select-none align-top ${col.className || ''}`}
                     onClick={() => toggleSort(col.key)}
                   >
                     <div className="flex items-center gap-1">
@@ -116,7 +116,7 @@ export default function TableView() {
               {filtered.map((i) => (
                 <tr key={i.id} className="border-b hover:bg-emerald-50/60">
                   {columns.map(col => (
-                    <td key={col.key} className="px-4 py-3 text-gray-700 align-top">
+                    <td key={col.key} className={`px-4 py-3 text-gray-700 align-top ${col.className || ''}`}>
                       {col.render ? col.render(i) : (i[col.key] || '—')}
                     </td>
                   ))}
@@ -138,20 +138,18 @@ export default function TableView() {
 }
 
 const columns = [
-  { key: 'initiative', label: 'Initiative', render: (i) => <span className="font-medium text-gray-800">{i.initiative || '—'}</span> },
-  { key: 'description', label: 'Description' },
-  { key: 'commune', label: 'Commune / Village', render: (i) => i.commune || i.village || '—' },
-  { key: 'zone_intervention', label: 'Zone intervention' },
-  { key: 'actor_type', label: "Type d'acteur" },
-  { key: 'activities', label: 'Activités', render: (i) => (i.activities || []).join(', ') || '—' },
-  { key: 'year', label: 'Année' },
-  { key: 'lat', label: 'Lat' },
-  { key: 'lon', label: 'Lon' },
-  { key: 'person_name', label: 'Contact' },
-  { key: 'contact_phone', label: 'Téléphone' },
-  { key: 'contact_email', label: 'Email' },
-  { key: 'website', label: 'Site web' },
-  { key: 'social_media', label: 'Réseaux sociaux', render: (i) => {
+  { key: 'initiative', label: 'Initiative', className: 'whitespace-nowrap', render: (i) => <span className="font-medium text-gray-800">{i.initiative || '—'}</span> },
+  { key: 'commune', label: 'Commune / Village', className: 'whitespace-nowrap', render: (i) => i.commune || i.village || '—' },
+  { key: 'actor_type', label: "Type d'acteur", className: 'hidden sm:table-cell whitespace-nowrap' },
+  { key: 'activities', label: 'Activités', className: 'hidden md:table-cell', render: (i) => (i.activities || []).join(', ') || '—' },
+  { key: 'year', label: 'Année', className: 'hidden sm:table-cell whitespace-nowrap' },
+  { key: 'description', label: 'Description', className: 'hidden lg:table-cell' },
+  { key: 'zone_intervention', label: 'Zone intervention', className: 'hidden lg:table-cell' },
+  { key: 'person_name', label: 'Contact', className: 'hidden md:table-cell whitespace-nowrap' },
+  { key: 'contact_phone', label: 'Téléphone', className: 'hidden md:table-cell whitespace-nowrap' },
+  { key: 'contact_email', label: 'Email', className: 'hidden lg:table-cell whitespace-nowrap' },
+  { key: 'website', label: 'Site web', className: 'hidden lg:table-cell', },
+  { key: 'social_media', label: 'Réseaux sociaux', className: 'hidden xl:table-cell', render: (i) => {
     const sm = i.social_media;
     if (!sm) return '—';
     if (Array.isArray(sm)) return sm.map(s => s.url || s.platform || '').filter(Boolean).join(', ') || '—';
@@ -161,17 +159,19 @@ const columns = [
     }
     return '—';
   }},
-  { key: 'videos', label: 'Vidéos', render: (i) => {
+  { key: 'videos', label: 'Vidéos', className: 'hidden xl:table-cell', render: (i) => {
     const vids = i.videos;
     if (!vids) return '—';
     if (Array.isArray(vids)) return vids.join(', ') || '—';
     return vids;
   }},
-  { key: 'extra_fields', label: 'Champs supplémentaires', render: (i) => {
+  { key: 'extra_fields', label: 'Champs supplémentaires', className: 'hidden xl:table-cell', render: (i) => {
     const extras = i.extra_fields;
     if (!extras || Object.keys(extras).length === 0) return '—';
     return Object.entries(extras).map(([k,v]) => `${k}: ${v}`).join(' • ');
   }},
-  { key: 'status', label: 'Statut' },
-  { key: 'created_at', label: 'Créé le', render: (i) => i.created_at ? new Date(i.created_at).toLocaleDateString() : '—' }
+  { key: 'status', label: 'Statut', className: 'hidden xl:table-cell whitespace-nowrap' },
+  { key: 'created_at', label: 'Créé le', className: 'hidden xl:table-cell whitespace-nowrap', render: (i) => i.created_at ? new Date(i.created_at).toLocaleDateString() : '—' },
+  { key: 'lat', label: 'Lat', className: 'hidden 2xl:table-cell whitespace-nowrap' },
+  { key: 'lon', label: 'Lon', className: 'hidden 2xl:table-cell whitespace-nowrap' },
 ];

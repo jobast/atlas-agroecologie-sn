@@ -52,10 +52,11 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
     <MapContainer
       whenCreated={(map) => {
         mapRef.current = map;
-        map.setView([12.84, -16.24], 10);
+        map.fitBounds(initialBounds, { padding: [20, 20] });
+        map.setMinZoom(8);
       }}
-      center={[12.84, -16.24]}
-      zoom={10}
+      bounds={initialBounds}
+      boundsOptions={{ padding: [20, 20] }}
       className="h-full w-full"
     >
       {currentBasemap === 'streets' && (

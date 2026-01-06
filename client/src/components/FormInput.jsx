@@ -327,7 +327,7 @@ export default function FormInput() {
                 <li>Cliquez directement sur la carte pour déposer un point</li>
               </ul>
             </div>
-            <div className="grid grid-cols-2 gap-4 mb-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
               <input name="lat" placeholder="Latitude" value={formData.lat}
                 onChange={e => setFormData({ ...formData, lat: e.target.value })}
                 className="border rounded px-3 py-2" />
@@ -337,8 +337,7 @@ export default function FormInput() {
             </div>
             <MapContainer center={[parseFloat(formData.lat) || 14.5, parseFloat(formData.lon) || -17.5]}
               zoom={7} scrollWheelZoom={true} fullscreenControl={true}
-              style={{ height: '300px', width: '100%' }}
-              className="rounded border shadow mb-2"
+              className="rounded border shadow mb-2 h-64 sm:h-80 w-full"
             >
               <LayersControl position="topright">
                 <LayersControl.BaseLayer checked name="Satellite">

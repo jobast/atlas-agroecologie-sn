@@ -7,7 +7,7 @@ const formatLabel = (value) => {
   return replaced.charAt(0).toUpperCase() + replaced.slice(1);
 };
 
-export default function Sidebar({ stats }) {
+export default function Sidebar({ stats, variant = 'overlay' }) {
   const actorEntries = stats?.actors ? Object.entries(stats.actors) : [];
   const actorTotal = actorEntries.reduce((sum, [, v]) => sum + v, 0);
   const actorSegments = actorEntries.map(([k, v]) => ({
@@ -23,13 +23,15 @@ export default function Sidebar({ stats }) {
     return { ...seg, start, pct };
   });
 
+  const isEmbedded = variant === 'embedded';
+
   return (
-    <div className="absolute right-0 top-0 w-full md:w-96 h-full z-50">
-      <div className="relative bg-emerald-50 w-full h-full shadow-xl animate-[slide-in_0.2s_ease-out] border-l border-emerald-100 flex flex-col overflow-hidden">
+    <div className={isEmbedded ? 'w-full' : 'absolute right-0 top-0 w-full md:w-96 h-full z-50'}>
+      <div className={`relative bg-emerald-50 w-full shadow-xl border-emerald-100 flex flex-col overflow-hidden ${isEmbedded ? 'rounded-xl border' : 'h-full border-l animate-[slide-in_0.2s_ease-out]'}`}>
         <div className="p-4 border-b border-emerald-200 flex items-center justify-between">
           <h3 className="font-bold text-lg">Vue d’ensemble</h3>
         </div>
-        <div className="p-4 space-y-4 text-sm flex-1">
+        <div className={`p-4 space-y-4 text-sm ${isEmbedded ? '' : 'flex-1'}`}>
             <div className="space-y-3">
               <div className="text-gray-700 text-lg font-semibold">Statistiques rapides</div>
               <div className="grid grid-cols-2 gap-2 text-sm">
