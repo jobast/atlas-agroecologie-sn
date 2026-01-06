@@ -78,6 +78,7 @@ export default function Navbar() {
           Atlas des initiatives agroécologiques
         </Link>
         {navButton('/map', 'Carte')}
+        {navButton('/table', 'Tableau')}
         {token && navButton('/my-initiatives', 'Mes initiatives')}
         {token && navButton('/submit', 'Soumettre')}
         {isAdmin && navButton('/admin', 'Gérer les données')}

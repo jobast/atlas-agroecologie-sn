@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, useMap, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Marker, Popup } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -35,7 +35,8 @@ function Recenter({ points, selectedId, focusPoint }) {
     const lon = parseFloat(target.lon);
     if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
       const currentZoom = map.getZoom() || 10;
-      map.flyTo([lat, lon], currentZoom, { duration: 0.5 });
+      const targetZoom = Math.max(currentZoom, 13); // zoom village
+      map.flyTo([lat, lon], targetZoom, { duration: 0.5 });
     }
   }, [points, selectedId, focusPoint, map]);
   return null;
@@ -119,7 +120,7 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
             const color = useActivityPalette ? colorForActivity(mainAct) : baseGreen;
             const isSelected = pt.id === selectedId;
             const icon = L.divIcon({
-              html: `<div style="background:${color};width:${isSelected ? 18 : 14}px;height:${isSelected ? 18 : 14}px;border:2px solid white;border-radius:9999px;"></div>`,
+              html: `<div style="background:${color};width:${isSelected ? 28 : 14}px;height:${isSelected ? 28 : 14}px;border:${isSelected ? 3 : 2}px solid white;border-radius:9999px;"></div>`,
               className: ''
             });
             return (
@@ -128,7 +129,18 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
                 position={[pt.latNum, pt.lonNum]}
                 icon={icon}
                 eventHandlers={{ click: () => onSelect?.(pt.id, pt) }}
-              />
+              >
+                <Popup>
+                  <div className="text-sm space-y-1">
+                    <div className="font-semibold">{pt.initiative || 'Sans nom'}</div>
+                    <div className="text-gray-700">{pt.commune || pt.village || 'Localisation inconnue'}</div>
+                    <div className="text-gray-600">{pt.actor_type || 'Type non renseigné'}</div>
+                    {pt.activities && pt.activities.length > 0 && (
+                      <div className="text-gray-600">Activités : {pt.activities.join(', ')}</div>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
             );
           })}
       </MarkerClusterGroup>

@@ -18,6 +18,7 @@ import RequestReset from './components/RequestReset';
 import ResetPassword from './components/ResetPassword';
 import FormFieldsManager from './components/FormFieldsManager';
 import Footer from './components/Footer';
+import TableView from './components/TableView';
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/map" element={<CartoModule />} />
+          <Route path="/table" element={<TableView />} />
           <Route path="/submit" element={
             <ProtectedRoute>
               <FormInput />
