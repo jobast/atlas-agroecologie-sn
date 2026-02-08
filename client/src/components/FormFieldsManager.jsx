@@ -3,7 +3,8 @@ import axios from 'axios';
 
 export default function FormFieldsManager() {
   const [fields, setFields] = useState([]);
-  const [draft, setDraft] = useState({ key: '', label: '', type: 'text', required: false, dytael: '' });
+  const [dytaels, setDytaels] = useState([]);
+  const [draft, setDraft] = useState({ key: '', label: '', type: 'text', required: false, dytael_id: '' });
   const [message, setMessage] = useState('');
   const token = localStorage.getItem('token');
 
@@ -17,7 +18,12 @@ export default function FormFieldsManager() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    axios.get(`${import.meta.env.VITE_API_URL}/dytaels`)
+      .then(res => setDytaels(res.data || []))
+      .catch(() => setDytaels([]));
+  }, []);
 
   const addField = async () => {
     if (!draft.key.trim() || !draft.label.trim()) return;
@@ -27,9 +33,9 @@ export default function FormFieldsManager() {
         field_label: draft.label.trim(),
         field_type: draft.type,
         required: draft.required,
-        dytael: draft.dytael || null
+        dytael_id: draft.dytael_id || null
       }, { headers: { Authorization: `Bearer ${token}` } });
-      setDraft({ key: '', label: '', type: 'text', required: false, dytael: '' });
+      setDraft({ key: '', label: '', type: 'text', required: false, dytael_id: '' });
       setMessage('Champ ajouté.');
       load();
     } catch (err) {
@@ -37,6 +43,10 @@ export default function FormFieldsManager() {
       setTimeout(() => setMessage(''), 1500);
     }
   };
+
+  // Build a lookup for DyTAEL names
+  const dytaelMap = {};
+  dytaels.forEach(d => { dytaelMap[d.id] = d.name; });
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -69,13 +79,16 @@ export default function FormFieldsManager() {
           <option value="number">Nombre</option>
           <option value="textarea">Zone de texte</option>
         </select>
-        <input
-          type="text"
-          placeholder="DyTAEL (optionnel)"
-          value={draft.dytael}
-          onChange={(e) => setDraft({ ...draft, dytael: e.target.value })}
+        <select
+          value={draft.dytael_id}
+          onChange={(e) => setDraft({ ...draft, dytael_id: e.target.value })}
           className="border rounded px-3 py-2"
-        />
+        >
+          <option value="">Global (tous les DyTAELs)</option>
+          {dytaels.map(d => (
+            <option key={d.id} value={d.id}>{d.name}</option>
+          ))}
+        </select>
       </div>
       <label className="inline-flex items-center space-x-2 mb-4">
         <input
@@ -95,11 +108,11 @@ export default function FormFieldsManager() {
       <div className="mt-6 space-y-2">
         {fields.length === 0 && <p className="text-gray-500">Aucun champ ajouté.</p>}
         {fields.map((f) => (
-          <div key={`${f.dytael || 'global'}-${f.field_key || f.key}`} className="border rounded px-3 py-2 flex justify-between items-center">
+          <div key={`${f.dytael_id || 'global'}-${f.field_key || f.key}`} className="border rounded px-3 py-2 flex justify-between items-center">
             <div>
               <div className="font-semibold">{f.field_label || f.label}</div>
               <div className="text-xs text-gray-500">
-                {(f.field_key || f.key)} · {f.field_type || f.type} · {f.dytael || 'Global'} {f.required ? '· obligatoire' : ''}
+                {(f.field_key || f.key)} · {f.field_type || f.type} · {f.dytael_id ? (dytaelMap[f.dytael_id] || `DyTAEL #${f.dytael_id}`) : 'Global'} {f.required ? '· obligatoire' : ''}
               </div>
             </div>
           </div>

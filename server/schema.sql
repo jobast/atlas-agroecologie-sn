@@ -1,4 +1,19 @@
--- Table des utilisateurs
+-- DyTAELs (regional entities)
+CREATE TABLE IF NOT EXISTS dytaels (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL UNIQUE,
+  slug VARCHAR(100) NOT NULL UNIQUE,
+  description TEXT,
+  bounds_sw_lat DOUBLE NOT NULL,
+  bounds_sw_lon DOUBLE NOT NULL,
+  bounds_ne_lat DOUBLE NOT NULL,
+  bounds_ne_lon DOUBLE NOT NULL,
+  default_zoom INT DEFAULT 10,
+  active BOOLEAN DEFAULT TRUE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Users
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   email VARCHAR(255) NOT NULL UNIQUE,
@@ -7,13 +22,15 @@ CREATE TABLE IF NOT EXISTS users (
   surname VARCHAR(100),
   phone VARCHAR(50),
   organization VARCHAR(255),
+  dytael_id INT NULL,
   role VARCHAR(50) DEFAULT 'editor',
   confirmed BOOLEAN DEFAULT FALSE,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  last_login DATETIME
+  last_login DATETIME,
+  FOREIGN KEY (dytael_id) REFERENCES dytaels(id) ON DELETE SET NULL
 );
 
--- Table des initiatives (alignée sur l'API data.js)
+-- Initiatives
 CREATE TABLE IF NOT EXISTS initiatives (
   id INT AUTO_INCREMENT PRIMARY KEY,
   initiative VARCHAR(255) NOT NULL,
@@ -36,21 +53,24 @@ CREATE TABLE IF NOT EXISTS initiatives (
   status VARCHAR(50) DEFAULT 'pending',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   user_id INT,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  dytael_id INT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (dytael_id) REFERENCES dytaels(id) ON DELETE SET NULL
 );
 
--- Champs personnalisés Dynamiques
+-- Custom fields
 CREATE TABLE IF NOT EXISTS custom_fields (
   id INT AUTO_INCREMENT PRIMARY KEY,
   field_key VARCHAR(100) NOT NULL,
   field_label VARCHAR(255) NOT NULL,
   field_type VARCHAR(50) NOT NULL DEFAULT 'text',
   required BOOLEAN DEFAULT FALSE,
-  dytael VARCHAR(100), -- identifiant du dytael si spécifique, NULL pour global
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  dytael_id INT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (dytael_id) REFERENCES dytaels(id) ON DELETE SET NULL
 );
 
--- Table des photos (référencée dans routes/data.js)
+-- Photos
 CREATE TABLE IF NOT EXISTS photos (
   id INT AUTO_INCREMENT PRIMARY KEY,
   initiative_id INT NOT NULL,

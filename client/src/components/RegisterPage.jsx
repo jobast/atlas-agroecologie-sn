@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,10 +11,18 @@ export default function RegisterPage() {
   const [surname, setSurname] = useState('');
   const [phone, setPhone] = useState('');
   const [organization, setOrganization] = useState('');
+  const [dytaelId, setDytaelId] = useState('');
+  const [dytaels, setDytaels] = useState([]);
   const [registered, setRegistered] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    axios.get(`${import.meta.env.VITE_API_URL}/dytaels`)
+      .then(res => setDytaels(res.data || []))
+      .catch(() => setDytaels([]));
+  }, []);
 
   const handleRegister = async (e) => {
   e.preventDefault();
@@ -51,7 +59,8 @@ export default function RegisterPage() {
       name,
       surname,
       phone,
-      organization
+      organization,
+      dytael_id: dytaelId
     });
     setRegistered(true);
   
@@ -107,7 +116,20 @@ return (
         </div>
       )}
       <form onSubmit={handleRegister} className="space-y-4">
-        {/* (form fields stay unchanged) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">DyTAEL *</label>
+          <select
+            value={dytaelId}
+            onChange={e => setDytaelId(e.target.value)}
+            required
+            className="mt-1 block w-full border border-gray-300 rounded px-3 py-2"
+          >
+            <option value="">-- Sélectionner votre DyTAEL --</option>
+            {dytaels.map(d => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Prénom</label>
           <input

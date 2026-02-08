@@ -23,10 +23,18 @@ export default function LoginPage() {
       if (res.data.token) {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
-        if (res.data.user?.role === 'admin') {
-          navigate('/admin');
+        window.dispatchEvent(new Event('auth-change'));
+
+        const user = res.data.user;
+        const role = user.role === 'admin' ? 'dytael_admin' : user.role;
+        const slug = user.dytael_slug || 'national';
+
+        if (role === 'dytaes_admin') {
+          navigate('/national/admin');
+        } else if (['dytael_admin', 'admin'].includes(user.role)) {
+          navigate(`/${slug}/admin`);
         } else {
-          navigate('/submit');
+          navigate(`/${slug}/map`);
         }
       }
     } catch (err) {
@@ -83,7 +91,7 @@ export default function LoginPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                 </svg>
-                Connexion…
+                Connexion...
               </span>
             ) : "Se connecter"}
           </button>

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { useDytael } from '../context/DytaelContext';
 
 const parseMaybeJson = (value, fallback) => {
   if (value === null || value === undefined || value === '') return fallback;
@@ -13,6 +14,8 @@ const parseMaybeJson = (value, fallback) => {
 };
 
 export default function AdminDashboard() {
+  const { slug } = useParams();
+  const { currentDytael, isNational } = useDytael();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -26,8 +29,11 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const params = {};
+        if (currentDytael) params.dytael_id = currentDytael.id;
         const res = await axios.get(`${import.meta.env.VITE_API_URL}/data`, {
           headers: { Authorization: `Bearer ${token}` },
+          params,
         });
         const normalized = res.data.map((i) => ({
           ...i,
@@ -49,7 +55,7 @@ export default function AdminDashboard() {
       }
     };
     fetchData();
-  }, []);
+  }, [currentDytael]);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
@@ -299,7 +305,7 @@ export default function AdminDashboard() {
             </div>
             <div className="mt-4 flex gap-2">
               <Link
-                to={`/edit/${detailItem.id}`}
+                to={`/${slug}/edit/${detailItem.id}`}
                 className="bg-blue-500 text-white px-3 py-1 rounded text-sm"
               >
                 ✏️ Modifier

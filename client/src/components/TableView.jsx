@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import { useDytael } from '../context/DytaelContext';
 
 const parseActivities = (a) => {
   if (Array.isArray(a)) return a;
@@ -16,6 +17,7 @@ const parseExtra = (e) => {
 };
 
 export default function TableView() {
+  const { currentDytael } = useDytael();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -24,7 +26,9 @@ export default function TableView() {
   const [sortDir, setSortDir] = useState('asc');
 
   useEffect(() => {
-    axios.get(`${import.meta.env.VITE_API_URL}/data?status=approved`)
+    const params = new URLSearchParams({ status: 'approved' });
+    if (currentDytael) params.set('dytael_id', currentDytael.id);
+    axios.get(`${import.meta.env.VITE_API_URL}/data?${params}`)
       .then(res => {
         const normalized = res.data.map((i) => ({
           ...i,
@@ -35,7 +39,7 @@ export default function TableView() {
       })
       .catch(() => setError("Impossible de charger les initiatives."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [currentDytael]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();

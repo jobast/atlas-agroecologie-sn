@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 
 export default function EditInitiative() {
-  const { id } = useParams();
+  const { id, slug } = useParams();
   const navigate = useNavigate();
   const [unauthorized, setUnauthorized] = useState(false);
 
@@ -11,7 +11,7 @@ export default function EditInitiative() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
-      if (parsedUser.role !== 'admin') {
+      if (!['admin', 'dytael_admin', 'dytaes_admin'].includes(parsedUser.role)) {
         setUnauthorized(true);
       }
     } else {
@@ -63,7 +63,7 @@ useEffect(() => {
     })
     .then(() => {
       alert("Initiative modifiée avec succès");
-      navigate("/my-initiatives");
+      navigate(`/${slug}/my-initiatives`);
     })
     .catch((err) => {
       console.error("Erreur modification:", err);

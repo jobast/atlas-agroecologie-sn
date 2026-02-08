@@ -1,8 +1,11 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useDytael } from '../context/DytaelContext';
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { slug } = useParams();
+  const { currentDytael, isNational } = useDytael();
   const token = localStorage.getItem('token');
   let user = null;
   let isAdmin = false;
@@ -13,23 +16,25 @@ export default function LandingPage() {
       user = JSON.parse(localStorage.getItem('user'));
       if (user && user.id && user.role) {
         isAuthenticated = true;
-        isAdmin = user.role === 'admin';
+        isAdmin = ['admin', 'dytael_admin', 'dytaes_admin'].includes(user.role);
       } else {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
     }
   } catch (err) {
-    console.warn("❗ Erreur parsing user :", err);
+    console.warn("Erreur parsing user :", err);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
   }
+
+  const p = (path) => `/${slug}${path}`;
 
   const handleAddInitiative = () => {
     if (!isAuthenticated) {
       navigate('/login');
     } else {
-      navigate('/submit');
+      navigate(p('/submit'));
     }
   };
 
@@ -37,23 +42,30 @@ export default function LandingPage() {
     if (!isAuthenticated) {
       navigate('/login');
     } else {
-      navigate('/my-initiatives');
+      navigate(p('/my-initiatives'));
     }
   };
+
+  const titleSuffix = isNational
+    ? 'Sénégal'
+    : (currentDytael?.name || slug);
+
+  const descriptionText = isNational
+    ? "Cet outil de cartographie permet d'identifier, visualiser et valoriser les acteurs et initiatives agroécologiques au niveau national."
+    : `Cet outil de cartographie permet d'identifier, visualiser et valoriser les acteurs et initiatives agroécologiques du département de ${titleSuffix}. Il a été conçu par la DyTAEL de ${titleSuffix}.`;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto text-center mt-12 px-4">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Atlas des initiatives agroécologiques</h1>
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">
+          Atlas des initiatives agroécologiques — {titleSuffix}
+        </h1>
         <h2 className="text-lg font-semibold text-gray-700 mb-4">Bienvenue !</h2>
-        <p className="text-gray-700">
-          Cet outil de cartographie permet d’identifier, visualiser et valoriser les acteurs et initiatives
-          agroécologiques du département de Bignona. Il a été conçu par la DYTAEL de Bignona.
-        </p>
+        <p className="text-gray-700">{descriptionText}</p>
       </div>
 
       <div className="max-w-4xl mx-auto py-16 px-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 text-center">
-        <div onClick={() => navigate('/map')} className="cursor-pointer bg-white shadow p-6 rounded hover:bg-blue-50 transition">
+        <div onClick={() => navigate(p('/map'))} className="cursor-pointer bg-white shadow p-6 rounded hover:bg-blue-50 transition">
           <svg className="mx-auto mb-2 w-8 h-8 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A2 2 0 013 15.382V5.618a2 2 0 011.553-1.948L9 2m0 18l6-3m-6 3V2m6 15l5.447-2.724A2 2 0 0021 15.382V5.618a2 2 0 00-1.553-1.948L15 2m0 18V2" />
           </svg>
@@ -85,14 +97,14 @@ export default function LandingPage() {
 
         {isAdmin && (
           <>
-            <div onClick={() => navigate('/admin')} className="cursor-pointer bg-white shadow p-6 rounded hover:bg-red-50 transition">
+            <div onClick={() => navigate(p('/admin'))} className="cursor-pointer bg-white shadow p-6 rounded hover:bg-red-50 transition">
               <svg className="mx-auto mb-2 w-8 h-8 text-red-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h18M3 12h18M3 17h18" />
               </svg>
               <p className="font-medium">Gérer les données</p>
             </div>
 
-            <div onClick={() => navigate('/users')} className="cursor-pointer bg-white shadow p-6 rounded hover:bg-pink-50 transition">
+            <div onClick={() => navigate(p('/users'))} className="cursor-pointer bg-white shadow p-6 rounded hover:bg-pink-50 transition">
               <svg className="mx-auto mb-2 w-8 h-8 text-pink-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-4-4h-1M7 20H2v-2a4 4 0 014-4h1m6-4a4 4 0 11-8 0 4 4 0 018 0zm6 0a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>

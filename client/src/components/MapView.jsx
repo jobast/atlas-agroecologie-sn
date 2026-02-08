@@ -4,9 +4,9 @@ import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const initialBounds = [
-  [12.45, -16.78], // South-West
-  [13.23, -15.70]  // North-East
+const DEFAULT_BOUNDS = [
+  [12.0, -17.6], // South-West (Senegal)
+  [16.7, -11.3]  // North-East (Senegal)
 ];
 
 const baseGreen = '#16a34a';
@@ -59,7 +59,8 @@ function Recenter({ points, selectedId, focusPoint }) {
   return null;
 }
 
-export default function MapView({ points = [], selectedId, onSelect, basemap, setBasemap, focusPoint, activeActivities = [] }) {
+export default function MapView({ points = [], selectedId, onSelect, basemap, setBasemap, focusPoint, activeActivities = [], bounds: propBounds }) {
+  const initialBounds = propBounds || DEFAULT_BOUNDS;
   const mapRef = useRef();
   const [localBasemap, setLocalBasemap] = useState(basemap || 'streets');
   const currentBasemap = basemap || localBasemap;

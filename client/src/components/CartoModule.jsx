@@ -5,6 +5,7 @@ import ListView from './ListView';
 import SearchBar from './SearchBar';
 import Filters from './Filters';
 import Sidebar from './Sidebar';
+import { useDytael } from '../context/DytaelContext';
 
 const parseActivities = (a) => {
   if (Array.isArray(a)) return a;
@@ -28,6 +29,7 @@ const parsePoint = (pt) => ({
 });
 
 export default function CartoModule() {
+  const { currentDytael, isNational, bounds } = useDytael();
   const [raw, setRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -44,11 +46,13 @@ export default function CartoModule() {
   const [basemap, setBasemap] = useState('streets');
 
   useEffect(() => {
-    axios.get(`${import.meta.env.VITE_API_URL}/data?status=approved`)
+    const params = new URLSearchParams({ status: 'approved' });
+    if (currentDytael) params.set('dytael_id', currentDytael.id);
+    axios.get(`${import.meta.env.VITE_API_URL}/data?${params}`)
       .then(res => setRaw(res.data.map(parsePoint)))
       .catch(() => setError("Impossible de charger les initiatives."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [currentDytael]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -145,6 +149,7 @@ export default function CartoModule() {
             setBasemap={setBasemap}
             focusPoint={focusPoint}
             activeActivities={filters.activities}
+            bounds={bounds}
           />
         )}
         {error && <div className="absolute inset-0 flex items-center justify-center text-red-600 bg-white/80">{error}</div>}

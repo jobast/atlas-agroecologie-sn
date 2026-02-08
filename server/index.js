@@ -45,11 +45,13 @@ const auth = require('./routes/auth');
 const data = require('./routes/data');
 const users = require('./routes/users');
 const customFields = require('./routes/customFields');
+const dytaels = require('./routes/dytaels');
 
 app.use('/api/auth', auth);
 app.use('/api/data', data);
 app.use('/api/users', users);
 app.use('/api/custom-fields', customFields);
+app.use('/api/dytaels', dytaels);
 
 app.get('/api/version', (req, res) => {
   res.json({

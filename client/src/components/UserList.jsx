@@ -58,6 +58,7 @@ export default function UserList() {
               <th className="border px-4 py-2">Nom</th>
               <th className="border px-4 py-2">Prénom</th>
               <th className="border px-4 py-2">Rôle</th>
+              <th className="border px-4 py-2">DyTAEL</th>
               <th className="border px-4 py-2">Confirmé</th>
               <th className="border px-4 py-2">Téléphone</th>
               <th className="border px-4 py-2">Inscription</th>
@@ -72,6 +73,7 @@ export default function UserList() {
                 <td className="border px-4 py-2">{u.name}</td>
                 <td className="border px-4 py-2">{u.surname}</td>
                 <td className="border px-4 py-2">{u.role}</td>
+                <td className="border px-4 py-2">{u.dytael_name || '–'}</td>
                 <td className="border px-4 py-2">{u.confirmed === true ? "Oui" : "Non"}</td>
                 <td className="border px-4 py-2">{u.phone || '–'}</td>
                 <td className="border px-4 py-2">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '–'}</td>

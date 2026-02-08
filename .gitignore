@@ -6,3 +6,9 @@ node_modules/
 !client/.env.production
 npm-debug.log*
 .DS_Store
+# Frontend build (prod only)
+index.html
+assets/
+
+# Server-local
+client/package-lock.json

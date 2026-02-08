@@ -3,7 +3,7 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const pool = require('../config/db');
-const { authenticateToken, requireRole } = require('../middleware/authMiddleware');
+const { authenticateToken, requireRole, hasRole, normalizeRole } = require('../middleware/authMiddleware');
 const jwt = require('jsonwebtoken');
 const SECRET = process.env.JWT_SECRET || 'supersecretkey';
 const { sendNewSubmissionAlert } = require('../utils/mailer');
@@ -99,9 +99,9 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
         actor_type, year, activities, lat, lon,
         contact_email, contact_phone, person_name,
         website, social_media, videos, extra_fields,
-        created_at, user_id, status
+        created_at, user_id, dytael_id, status
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'pending')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, 'pending')
     `;
 
     // Normaliser les champs JSON/array
@@ -136,6 +136,13 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
       return res.status(403).json({ error: 'Utilisateur inconnu.' });
     }
 
+    // dytael_id: dytaes_admin can specify explicitly, others use their own
+    const userRole = normalizeRole(req.user.role);
+    let dytaelId = req.user.dytael_id || null;
+    if (userRole === 'dytaes_admin' && req.body.dytael_id) {
+      dytaelId = parseInt(req.body.dytael_id);
+    }
+
     const [result] = await conn.query(insertSQL, [
       initiative,
       description,
@@ -154,7 +161,8 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
       JSON.stringify(socialMediaJson),
       videosJson,
       extraFieldsJson,
-      userId
+      userId,
+      dytaelId
     ]);
 
     const initiativeId = result.insertId;
@@ -181,7 +189,7 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
 // ✅ GET /api/data – avec filtre facultatif ?status=pending
 // Public pour status=approved, sinon réservé aux admins (token requis).
 router.get('/', async (req, res) => {
-  const { status } = req.query;
+  const { status, dytael_id } = req.query;
   try {
     let user = null;
     const authHeader = req.headers['authorization'];
@@ -196,23 +204,42 @@ router.get('/', async (req, res) => {
 
     let query = `
       SELECT
-        id, initiative, description, village, commune, zone_intervention,
-        actor_type, year, activities, lat, lon,
-        contact_email, contact_phone, person_name,
-        website, social_media, videos, extra_fields, status,
-        created_at, user_id
-      FROM initiatives
+        i.id, i.initiative, i.description, i.village, i.commune, i.zone_intervention,
+        i.actor_type, i.year, i.activities, i.lat, i.lon,
+        i.contact_email, i.contact_phone, i.person_name,
+        i.website, i.social_media, i.videos, i.extra_fields, i.status,
+        i.created_at, i.user_id, i.dytael_id
+      FROM initiatives i
     `;
+    const conditions = [];
     const values = [];
 
     if (status) {
-      query += ' WHERE status = ?';
+      conditions.push('i.status = ?');
       values.push(status);
     } else {
-      // pas de statut => réservé admin
-      if (!user || user.role !== 'admin') {
+      // no status filter => admin access required
+      if (!user || !hasRole(normalizeRole(user.role), 'dytael_admin')) {
         return res.status(403).json({ error: 'Accès restreint' });
       }
+    }
+
+    // DyTAEL scoping
+    if (dytael_id) {
+      conditions.push('i.dytael_id = ?');
+      values.push(parseInt(dytael_id));
+    } else if (user && !status) {
+      // Admin without explicit dytael_id filter: scope dytael_admin to their DyTAEL
+      const userRole = normalizeRole(user.role);
+      if (userRole === 'dytael_admin' && user.dytael_id) {
+        conditions.push('i.dytael_id = ?');
+        values.push(user.dytael_id);
+      }
+      // dytaes_admin sees all
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
 
     const [rows] = await pool.query(query, values);
@@ -227,13 +254,24 @@ router.get('/', async (req, res) => {
 // ✅ DELETE /api/data/:id – suppression (admin ou propriétaire)
 router.delete('/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const isAdmin = req.user?.role === 'admin';
+  const isAdmin = hasRole(normalizeRole(req.user?.role), 'dytael_admin');
 
   try {
-    const sql = isAdmin
-      ? 'DELETE FROM initiatives WHERE id = ?'
-      : 'DELETE FROM initiatives WHERE id = ? AND user_id = ?';
-    const params = isAdmin ? [id] : [id, req.user.id];
+    let sql, params;
+    if (isAdmin) {
+      // dytael_admin: can only delete within their DyTAEL; dytaes_admin: can delete any
+      const isDytaes = normalizeRole(req.user.role) === 'dytaes_admin';
+      if (isDytaes) {
+        sql = 'DELETE FROM initiatives WHERE id = ?';
+        params = [id];
+      } else {
+        sql = 'DELETE FROM initiatives WHERE id = ? AND dytael_id = ?';
+        params = [id, req.user.dytael_id];
+      }
+    } else {
+      sql = 'DELETE FROM initiatives WHERE id = ? AND user_id = ?';
+      params = [id, req.user.id];
+    }
 
     const [result] = await pool.query(sql, params);
     if (result.affectedRows === 0) {
@@ -248,13 +286,22 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 
 // ✅ PUT /api/data/:id/validate – approuver une initiative (admin)
-router.put('/:id/validate', authenticateToken, requireRole('admin'), async (req, res) => {
+router.put('/:id/validate', authenticateToken, requireRole('dytael_admin'), async (req, res) => {
   const { id } = req.params;
   try {
-    await pool.query(
-      'UPDATE initiatives SET status = ? WHERE id = ?',
-      ['approved', id]
-    );
+    const userRole = normalizeRole(req.user.role);
+    let sql, params;
+    if (userRole === 'dytaes_admin') {
+      sql = 'UPDATE initiatives SET status = ? WHERE id = ?';
+      params = ['approved', id];
+    } else {
+      sql = 'UPDATE initiatives SET status = ? WHERE id = ? AND dytael_id = ?';
+      params = ['approved', id, req.user.dytael_id];
+    }
+    const [result] = await pool.query(sql, params);
+    if (result.affectedRows === 0) {
+      return res.status(403).json({ error: 'Non autorisé ou initiative introuvable.' });
+    }
     res.status(200).json({ message: 'Initiative validée' });
   } catch (err) {
     console.error('Erreur PUT /api/data/:id/validate:', err);
@@ -263,13 +310,22 @@ router.put('/:id/validate', authenticateToken, requireRole('admin'), async (req,
 });
 
 // ✅ PUT /api/data/:id/reject – rejeter une initiative (admin)
-router.put('/:id/reject', authenticateToken, requireRole('admin'), async (req, res) => {
+router.put('/:id/reject', authenticateToken, requireRole('dytael_admin'), async (req, res) => {
   const { id } = req.params;
   try {
-    await pool.query(
-      'UPDATE initiatives SET status = ? WHERE id = ?',
-      ['rejected', id]
-    );
+    const userRole = normalizeRole(req.user.role);
+    let sql, params;
+    if (userRole === 'dytaes_admin') {
+      sql = 'UPDATE initiatives SET status = ? WHERE id = ?';
+      params = ['rejected', id];
+    } else {
+      sql = 'UPDATE initiatives SET status = ? WHERE id = ? AND dytael_id = ?';
+      params = ['rejected', id, req.user.dytael_id];
+    }
+    const [result] = await pool.query(sql, params);
+    if (result.affectedRows === 0) {
+      return res.status(403).json({ error: 'Non autorisé ou initiative introuvable.' });
+    }
     res.status(200).json({ message: 'Initiative rejetée' });
   } catch (err) {
     console.error('Erreur PUT /api/data/:id/reject:', err);
@@ -278,7 +334,7 @@ router.put('/:id/reject', authenticateToken, requireRole('admin'), async (req, r
 });
 
 // ✅ PUT /api/data/:id/cancel-delete – annuler une demande de suppression (admin)
-router.put('/:id/cancel-delete', authenticateToken, requireRole('admin'), async (req, res) => {
+router.put('/:id/cancel-delete', authenticateToken, requireRole('dytael_admin'), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query(

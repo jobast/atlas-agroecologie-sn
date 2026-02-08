@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 
-export default function AdminRoute({ children }) {
+export default function DytaesRoute({ children }) {
   const token = localStorage.getItem('token');
   const user = JSON.parse(localStorage.getItem('user') || 'null');
 
@@ -9,9 +9,9 @@ export default function AdminRoute({ children }) {
     return <Navigate to="/login" />;
   }
 
-  const adminRoles = ['admin', 'dytael_admin', 'dytaes_admin'];
-  if (!adminRoles.includes(user.role)) {
-    return <Navigate to="/login" />;
+  const role = user.role === 'admin' ? 'dytael_admin' : user.role;
+  if (role !== 'dytaes_admin') {
+    return <Navigate to="/" />;
   }
 
   return children;

@@ -7,6 +7,10 @@ import 'leaflet-fullscreen';
 import 'leaflet-fullscreen/dist/leaflet.fullscreen.css';
 import { GeoSearchControl, OpenStreetMapProvider } from 'leaflet-geosearch';
 import 'leaflet-geosearch/dist/geosearch.css';
+import { useDytael } from '../context/DytaelContext';
+
+const MAX_PHOTOS = 5;
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5 Mo
 
 const markerIcon = new L.Icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -48,10 +52,11 @@ function SearchBox({ onPick }) {
   return null;
 }
 
-export default function FormInput() {
+export default function FormInput({ variant = 'default' }) {
+  const isMobile = variant === 'mobile';
+  const { currentDytael } = useDytael();
   const [customFields, setCustomFields] = useState([]);
   const [customValues, setCustomValues] = useState({});
-  const [dytael, setDytael] = useState('');
   const [formData, setFormData] = useState({
     initiative: '',
     description: '',
@@ -74,22 +79,39 @@ export default function FormInput() {
 
   const [videoLinks, setVideoLinks] = useState(['']);
   const [sameAsDeclarant, setSameAsDeclarant] = useState(false);
+  const [gpsAccuracy, setGpsAccuracy] = useState(null);
+  const [photoNotice, setPhotoNotice] = useState('');
 
   const [socialMedia, setSocialMedia] = useState([]);
   const [socialLinks, setSocialLinks] = useState({});
+  const accuracyWarning = gpsAccuracy !== null && gpsAccuracy > 20;
+  const containerClasses = isMobile ? 'bg-fond min-h-screen py-6 px-3' : 'bg-fond min-h-screen py-10 px-4';
+  const formClasses = isMobile ? 'mx-auto w-full max-w-2xl bg-white shadow p-5 rounded space-y-4' : 'max-w-2xl mx-auto bg-white shadow p-8 rounded space-y-4';
 
   useEffect(() => {
-    // charger champs dynamiques depuis l'API
-    const params = dytael ? `?dytael=${encodeURIComponent(dytael)}` : '';
+    const params = currentDytael ? `?dytael_id=${currentDytael.id}` : '';
     axios.get(`${import.meta.env.VITE_API_URL}/custom-fields${params}`)
       .then(res => setCustomFields(res.data || []))
       .catch(() => setCustomFields([]));
-  }, [dytael]);
+  }, [currentDytael]);
 
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
     if (type === 'file') {
-      setFormData({ ...formData, photos: Array.from(files).slice(0, 5) });
+      const picked = Array.from(files || []);
+      const limited = picked.slice(0, MAX_PHOTOS);
+      const filtered = limited.filter(f => f.size <= MAX_PHOTO_SIZE);
+      let notice = '';
+      if (picked.length > MAX_PHOTOS) {
+        notice = `Maximum ${MAX_PHOTOS} photos – seules les premières ont été conservées.`;
+      }
+      const rejected = limited.length - filtered.length;
+      if (rejected > 0) {
+        notice = `${notice ? `${notice} ` : ''}${rejected} photo(s) dépassent 5 Mo et ont été ignorées.`;
+      }
+      setPhotoNotice(notice);
+      setFormData({ ...formData, photos: filtered });
+      return;
     } else if (type === 'checkbox') {
       const newActivities = e.target.checked
         ? [...formData.activities, value]
@@ -141,6 +163,11 @@ export default function FormInput() {
     setCustomValues((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleLocationPick = ({ lat, lon }, accuracy = null) => {
+    setFormData(prev => ({ ...prev, lat, lon }));
+    setGpsAccuracy(typeof accuracy === 'number' ? accuracy : null);
+  };
+
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
       alert("La géolocalisation n'est pas supportée par votre navigateur.");
@@ -149,12 +176,14 @@ export default function FormInput() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const { latitude, longitude } = position.coords;
-        setFormData(prev => ({
-          ...prev,
-          lat: latitude.toFixed(6),
-          lon: longitude.toFixed(6),
-        }));
+        const { latitude, longitude, accuracy } = position.coords;
+        handleLocationPick(
+          {
+            lat: latitude.toFixed(6),
+            lon: longitude.toFixed(6),
+          },
+          typeof accuracy === 'number' ? parseFloat(accuracy.toFixed(1)) : null
+        );
       },
       (error) => {
         alert("Impossible d'obtenir la position actuelle.");
@@ -225,6 +254,8 @@ export default function FormInput() {
     setSocialLinks({});
     setSameAsDeclarant(false);
     setCustomValues({});
+    setGpsAccuracy(null);
+    setPhotoNotice('');
   } catch (error) {
     console.error("Erreur lors de la soumission :", error);
     alert('Erreur lors de l’envoi');
@@ -235,8 +266,8 @@ export default function FormInput() {
   const activityOptions = ['Production', 'Transformation', 'Commercialisation', 'Formation', 'Plaidoyer', 'Autre'];
 
   return (
-    <div className="bg-fond min-h-screen py-10 px-4">
-      <form onSubmit={handleSubmit} className="max-w-2xl mx-auto bg-white shadow p-8 rounded space-y-4">
+    <div className={containerClasses}>
+      <form onSubmit={handleSubmit} className={formClasses}>
         <h2 className="text-xl font-bold text-system mb-4">Nouvelle Initiative</h2>
         <p className="text-sm text-gray-600 italic mb-4">Les champs marqués d’un * sont obligatoires</p>
 
@@ -327,12 +358,24 @@ export default function FormInput() {
                 <li>Cliquez directement sur la carte pour déposer un point</li>
               </ul>
             </div>
+            {gpsAccuracy !== null && (
+              <div
+                className={`mb-2 flex items-start gap-2 rounded border px-3 py-2 text-sm ${
+                  accuracyWarning ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-green-200 bg-green-50 text-green-800'
+                }`}
+              >
+                <span className="font-semibold">Précision GPS :</span>
+                <span>
+                  {Math.round(gpsAccuracy)} m {accuracyWarning ? '(> 20 m – envoi possible mais moins précis)' : '(≤ 20 m)'}
+                </span>
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
               <input name="lat" placeholder="Latitude" value={formData.lat}
-                onChange={e => setFormData({ ...formData, lat: e.target.value })}
+                onChange={e => handleLocationPick({ lat: e.target.value, lon: formData.lon }, null)}
                 className="border rounded px-3 py-2" />
               <input name="lon" placeholder="Longitude" value={formData.lon}
-                onChange={e => setFormData({ ...formData, lon: e.target.value })}
+                onChange={e => handleLocationPick({ lat: formData.lat, lon: e.target.value }, null)}
                 className="border rounded px-3 py-2" />
             </div>
             <MapContainer center={[parseFloat(formData.lat) || 14.5, parseFloat(formData.lon) || -17.5]}
@@ -353,8 +396,8 @@ export default function FormInput() {
                   />
                 </LayersControl.BaseLayer>
               </LayersControl>
-              <SearchBox onPick={({ lat, lon }) => setFormData({ ...formData, lat, lon })} />
-              <LocationPicker onPick={({ lat, lon }) => setFormData({ ...formData, lat, lon })} />
+              <SearchBox onPick={({ lat, lon }) => handleLocationPick({ lat, lon }, null)} />
+              <LocationPicker onPick={({ lat, lon }) => handleLocationPick({ lat, lon }, null)} />
               {formData.lat && formData.lon && (
                 <Marker position={[parseFloat(formData.lat), parseFloat(formData.lon)]} icon={markerIcon} />
               )}
@@ -417,16 +460,17 @@ export default function FormInput() {
           />
           <input name="website" placeholder="Site internet" onChange={handleChange} className="w-full border rounded px-3 py-2 mb-2" />
 
-          <div className="mt-3">
-            <label className="block text-sm font-semibold mb-1">Profil DyTAEL (pour champs additionnels)</label>
-            <input
-              type="text"
-              placeholder="Ex: Mbour, Bignona..."
-              value={dytael}
-              onChange={(e) => setDytael(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
+          {currentDytael && (
+            <div className="mt-3">
+              <label className="block text-sm font-semibold mb-1">DyTAEL</label>
+              <input
+                type="text"
+                value={currentDytael.name}
+                readOnly
+                className="w-full border rounded px-3 py-2 bg-gray-100 text-gray-600"
+              />
+            </div>
+          )}
           <div className="mt-4">
             <label className="block font-semibold text-sm mb-1">Réseaux sociaux :</label>
             <div className="flex flex-wrap gap-3 mb-3">
@@ -501,6 +545,12 @@ export default function FormInput() {
               multiple
               className="w-full border rounded px-3 py-2"
             />
+            <p className="text-xs text-gray-600">Limite : 5 photos, 5 Mo chacune. Les fichiers trop volumineux sont ignorés.</p>
+            {photoNotice && (
+              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {photoNotice}
+              </div>
+            )}
           </div>
         </fieldset>
 

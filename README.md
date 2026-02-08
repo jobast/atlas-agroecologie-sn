@@ -21,6 +21,11 @@
 - Dynamic fields for videos and social media
 - Option to auto-fill contact info when same as declarant
 
+### 📱 Mobile Field Form
+- Route `/mobile-form` (protégée) qui reprend le formulaire “Ajouter une initiative” en mise en page mobile.
+- Se connecte au même backend/DB Infomaniak via `VITE_API_URL` (à renseigner dans `client/.env*`).
+- Indicateur de précision GPS (alerte au-delà de 20 m sans bloquer) et garde-fous sur les photos (5 max, 5 Mo chacune).
+
 ### 🗺️ Interactive Map
 - Leaflet map with custom SVG icons
 - Sidebar with:

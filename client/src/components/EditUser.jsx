@@ -5,7 +5,8 @@ import "./EditUser.css";
 export default function EditUser({ user, onUpdated }) {
   // Contrôle d'accès basé sur le rôle utilisateur
   const currentUser = JSON.parse(localStorage.getItem('user'));
-  if (!currentUser || currentUser.role !== 'admin') {
+  const adminRoles = ['admin', 'dytael_admin', 'dytaes_admin'];
+  if (!currentUser || !adminRoles.includes(currentUser.role)) {
     return <p className="text-center text-red-600 font-semibold">Accès réservé aux administrateurs.</p>;
   }
 
@@ -161,10 +162,9 @@ export default function EditUser({ user, onUpdated }) {
         onChange={handleChange}
         className="block w-full mb-2 border px-2 py-1"
       >
-        <option value="admin">Admin</option>
-        <option value="contributor">Contributor</option>
-        <option value="viewer">Viewer</option>
-        <option value="editor">Editor</option>
+        <option value="editor">Éditeur</option>
+        <option value="dytael_admin">Admin DyTAEL</option>
+        {currentUser.role === 'dytaes_admin' && <option value="dytaes_admin">Admin DyTAES</option>}
       </select>
       <label className="block mb-2">
         <input

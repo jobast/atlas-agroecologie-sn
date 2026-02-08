@@ -1,8 +1,11 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 
 export default function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams();
+  const slug = params.slug || null;
   const [token, setToken] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [userEmail, setUserEmail] = useState(null);
@@ -26,7 +29,7 @@ export default function Navbar() {
         setUserEmail(parsed.email);
         setToken(storedToken);
       } catch (e) {
-        console.error("Erreur de parsing du rôle utilisateur :", e);
+        console.error("Erreur de parsing du role utilisateur :", e);
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         setToken(null);
@@ -44,19 +47,27 @@ export default function Navbar() {
     syncAuthFromStorage();
     const handleStorage = () => syncAuthFromStorage();
     const handleFocus = () => syncAuthFromStorage();
+    const handleAuthChange = () => syncAuthFromStorage();
     window.addEventListener('storage', handleStorage);
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('auth-change', handleAuthChange);
     return () => {
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('auth-change', handleAuthChange);
     };
-  }, []);
+  }, [location.pathname]);
 
-  const isAdmin = userRole === 'admin';
+  const isAdmin = ['admin', 'dytael_admin', 'dytaes_admin'].includes(userRole);
+  const isDytaesAdmin = userRole === 'dytaes_admin';
+
+  // Build slug-prefixed path
+  const p = (path) => slug ? `/${slug}${path}` : path;
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    window.dispatchEvent(new Event('auth-change'));
     setToken(null);
     setUserRole(null);
     setUserEmail(null);
@@ -78,21 +89,34 @@ export default function Navbar() {
     </button>
   );
 
+  // Dynamic title based on current DyTAEL
+  let titleText = 'Atlas des initiatives agroécologiques';
+  let titleShort = 'Atlas Agroécologie';
+  if (slug && slug !== 'national') {
+    const dytaelName = slug.charAt(0).toUpperCase() + slug.slice(1);
+    titleText = `Atlas Agroécologie — ${dytaelName}`;
+    titleShort = dytaelName;
+  } else if (slug === 'national') {
+    titleText = 'Atlas Agroécologie — National';
+    titleShort = 'DyTAES National';
+  }
+
   return (
     <nav className="bg-emerald-800 text-white shadow p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-50">
       <div className="flex items-center gap-3 min-w-0">
         <Link to="/" className="font-bold text-white hover:text-emerald-100 transition-colors truncate">
-          <span className="hidden sm:inline text-xl">Atlas des initiatives agroécologiques</span>
-          <span className="sm:hidden text-base">Atlas Agroécologie</span>
+          <span className="hidden sm:inline text-xl">{titleText}</span>
+          <span className="sm:hidden text-base">{titleShort}</span>
         </Link>
         <div className="hidden md:flex items-center gap-4 ml-4">
-          {navButton('/map', 'Carte')}
-          {navButton('/table', 'Tableau')}
-          {token && navButton('/my-initiatives', 'Mes initiatives')}
-          {token && navButton('/submit', 'Soumettre')}
-          {isAdmin && navButton('/admin', 'Gérer les données')}
-          {isAdmin && navButton('/users', 'Gérer les utilisateurs')}
-          {isAdmin && navButton('/form-fields', 'Formulaire')}
+          {navButton(p('/map'), 'Carte')}
+          {navButton(p('/table'), 'Tableau')}
+          {token && navButton(p('/my-initiatives'), 'Mes initiatives')}
+          {token && navButton(p('/submit'), 'Soumettre')}
+          {isAdmin && navButton(p('/admin'), 'Gérer les données')}
+          {isAdmin && navButton(p('/users'), 'Gérer les utilisateurs')}
+          {isAdmin && navButton(p('/form-fields'), 'Formulaire')}
+          {isDytaesAdmin && navButton('/national/dytaels', 'DyTAELs')}
         </div>
       </div>
       <div className="hidden md:flex items-center gap-3">
@@ -145,13 +169,14 @@ export default function Navbar() {
           />
           <div className="absolute top-16 left-0 right-0 bg-emerald-800 text-white shadow-lg border-t border-white/10 p-4 space-y-3">
             <div className="flex flex-col gap-3">
-              {navButton('/map', 'Carte', 'text-left')}
-              {navButton('/table', 'Tableau', 'text-left')}
-              {token && navButton('/my-initiatives', 'Mes initiatives', 'text-left')}
-              {token && navButton('/submit', 'Soumettre', 'text-left')}
-              {isAdmin && navButton('/admin', 'Gérer les données', 'text-left')}
-              {isAdmin && navButton('/users', 'Gérer les utilisateurs', 'text-left')}
-              {isAdmin && navButton('/form-fields', 'Formulaire', 'text-left')}
+              {navButton(p('/map'), 'Carte', 'text-left')}
+              {navButton(p('/table'), 'Tableau', 'text-left')}
+              {token && navButton(p('/my-initiatives'), 'Mes initiatives', 'text-left')}
+              {token && navButton(p('/submit'), 'Soumettre', 'text-left')}
+              {isAdmin && navButton(p('/admin'), 'Gérer les données', 'text-left')}
+              {isAdmin && navButton(p('/users'), 'Gérer les utilisateurs', 'text-left')}
+              {isAdmin && navButton(p('/form-fields'), 'Formulaire', 'text-left')}
+              {isDytaesAdmin && navButton('/national/dytaels', 'DyTAELs', 'text-left')}
             </div>
             <div className="pt-3 border-t border-white/10 flex flex-col gap-3">
               {!token ? (

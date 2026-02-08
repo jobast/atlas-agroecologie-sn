@@ -8,60 +8,56 @@ const router = express.Router();
 const SECRET = process.env.JWT_SECRET || 'supersecretkey';
 const RESET_SECRET = process.env.JWT_RESET_SECRET || SECRET;
 
-// 🚀 INSCRIPTION
+// INSCRIPTION
 router.post('/register', async (req, res) => {
-  // Filtrer explicitement les champs nécessaires
   const {
     email,
     password,
     name,
     surname,
     phone,
-    organization
+    organization,
+    dytael_id
   } = req.body;
 
-  // Ne rien conserver d’autre
   if (!email || !password || !name || !surname || !phone || !organization) {
     return res.status(400).json({ message: "Tous les champs sont requis." });
+  }
+
+  if (!dytael_id) {
+    return res.status(400).json({ message: "Veuillez sélectionner un DyTAEL." });
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.status(400).json({ message: "Email invalide" });
   }
-  console.log('Données reçues pour inscription :', req.body);
-  console.log("✅ Données reçues:", req.body);
 
   try {
-    console.log("🔍 Vérification existence utilisateur...");
-    // Vérifier si l'utilisateur existe déjà
     const [existing] = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER(?)', [email]);
     if (existing.length > 0) {
       return res.status(400).json({ message: 'Email déjà utilisé' });
     }
 
-    console.log("🔐 Hashing du mot de passe...");
-    // Hasher le mot de passe
+    // Verify dytael_id exists
+    const [dytaelRows] = await pool.query('SELECT id FROM dytaels WHERE id = ? AND active = true', [dytael_id]);
+    if (dytaelRows.length === 0) {
+      return res.status(400).json({ message: 'DyTAEL invalide' });
+    }
+
     const hash = await bcrypt.hash(password, 10);
 
-    console.log("💾 Insertion dans la base...");
-    // Enregistrer l'utilisateur
     const [result] = await pool.query(
-      'INSERT INTO users (email, password, role, name, surname, phone, organization) VALUES (LOWER(?), ?, ?, ?, ?, ?, ?)',
-      [email, hash, 'editor', name, surname, phone, organization]
+      'INSERT INTO users (email, password, role, name, surname, phone, organization, dytael_id) VALUES (LOWER(?), ?, ?, ?, ?, ?, ?, ?)',
+      [email, hash, 'editor', name, surname, phone, organization, dytael_id]
     );
 
     const insertedId = result.insertId;
-
-    // Générer un token de confirmation après avoir inséré l'utilisateur
     const token = jwt.sign({ id: insertedId }, SECRET, { expiresIn: '1d' });
 
-    console.log("📨 Envoi de l'email de confirmation...");
-    // Envoyer l'email de confirmation
     const { sendConfirmationEmail } = require('../utils/mailer');
     await sendConfirmationEmail(email, token);
 
-    console.log("✅ Inscription terminée");
     res.status(201).json({
       id: insertedId,
       email,
@@ -70,18 +66,19 @@ router.post('/register', async (req, res) => {
       surname,
       phone,
       organization,
+      dytael_id,
       message: "Inscription réussie. Veuillez vérifier votre email pour confirmer votre compte."
     });
   } catch (err) {
-    console.error('Erreur dans la route /register :', err);  // Message explicite
+    console.error('Erreur dans la route /register :', err);
     res.status(500).json({
-      message: 'Erreur interne lors de l’inscription.',
+      message: "Erreur interne lors de l'inscription.",
       error: err.message || 'Unknown error'
     });
   }
 });
 
-// ✅ CONFIRMATION PAR EMAIL
+// CONFIRMATION PAR EMAIL
 router.get('/confirm/:token', async (req, res) => {
   const token = req.params.token;
 
@@ -89,20 +86,19 @@ router.get('/confirm/:token', async (req, res) => {
     const decoded = jwt.verify(token, SECRET);
     const userId = decoded.id;
 
-    // Mise à jour de l'utilisateur : confirmation
-    const [updateRes] = await pool.query(
+    await pool.query(
       'UPDATE users SET confirmed = true WHERE id = ?',
       [userId]
     );
 
-    res.send(`✅ Email confirmé. Vous pouvez maintenant vous connecter.`);
+    res.send(`Email confirmé. Vous pouvez maintenant vous connecter.`);
   } catch (err) {
     console.error('Erreur /confirm :', err);
-    res.status(400).send('❌ Lien invalide ou expiré.');
+    res.status(400).send('Lien invalide ou expiré.');
   }
 });
 
-// 🔐 CONNEXION
+// CONNEXION
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -122,10 +118,18 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Identifiants invalides' });
     }
 
-    // Enregistrer la date de dernière connexion
     await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [u.id]);
 
-    const token = jwt.sign({ id: u.id, role: u.role }, SECRET, { expiresIn: '1h' });
+    // Include dytael_id in JWT
+    const token = jwt.sign({ id: u.id, role: u.role, dytael_id: u.dytael_id || null }, SECRET, { expiresIn: '1h' });
+
+    // Fetch DyTAEL slug for redirect
+    let dytael_slug = null;
+    if (u.dytael_id) {
+      const [dRows] = await pool.query('SELECT slug FROM dytaels WHERE id = ?', [u.dytael_id]);
+      if (dRows.length > 0) dytael_slug = dRows[0].slug;
+    }
+
     res.json({
       token,
       user: {
@@ -135,7 +139,9 @@ router.post('/login', async (req, res) => {
         name: u.name,
         surname: u.surname,
         phone: u.phone,
-        organization: u.organization
+        organization: u.organization,
+        dytael_id: u.dytael_id || null,
+        dytael_slug
       }
     });
   } catch (err) {
@@ -144,18 +150,14 @@ router.post('/login', async (req, res) => {
   }
 });
 
-module.exports = router;
-
 // --- RESET PASSWORD ---
 
-// Demande de reset : envoie un lien avec token
 router.post('/request-reset', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: 'Email requis' });
   try {
     const [rows] = await pool.query('SELECT id FROM users WHERE LOWER(email)=LOWER(?)', [email]);
     if (rows.length === 0) {
-      // Pour éviter l’enumération, on renvoie 200 même si l’email n’existe pas
       return res.json({ message: 'Si le compte existe, un lien de réinitialisation a été envoyé.' });
     }
     const userId = rows[0].id;
@@ -169,7 +171,6 @@ router.post('/request-reset', async (req, res) => {
   }
 });
 
-// Vérifier le token de reset
 router.get('/reset/:token', async (req, res) => {
   const { token } = req.params;
   try {
@@ -180,7 +181,6 @@ router.get('/reset/:token', async (req, res) => {
   }
 });
 
-// Appliquer le nouveau mot de passe
 router.post('/reset/:token', async (req, res) => {
   const { token } = req.params;
   const { password } = req.body;
@@ -197,3 +197,5 @@ router.post('/reset/:token', async (req, res) => {
     res.status(400).json({ message: 'Token invalide ou expiré' });
   }
 });
+
+module.exports = router;

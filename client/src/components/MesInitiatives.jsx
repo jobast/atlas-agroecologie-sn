@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 
 export default function MesInitiatives() {
   const [initiatives, setInitiatives] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { slug } = useParams();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -44,7 +45,7 @@ export default function MesInitiatives() {
       <h1 className="text-2xl font-bold mb-4">Mes initiatives</h1>
 
       <button
-        onClick={() => navigate('/submit')}
+        onClick={() => navigate(`/${slug}/submit`)}
         className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 mb-4"
       >
         ➕ Nouvelle initiative
@@ -67,7 +68,7 @@ export default function MesInitiatives() {
               <div className="flex gap-2 mt-3">
                 <button
                   className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-sm"
-                  onClick={() => navigate(`/edit/${item.id}`)}
+                  onClick={() => navigate(`/${slug}/edit/${item.id}`)}
                 >
                   Modifier
                 </button>
