@@ -5,8 +5,8 @@
 @tailwind utilities;
 
 .carto-viewport {
-  height: calc(100vh - 4rem);
-  height: calc(100svh - 4rem);
+  height: calc(100vh - 3.5rem);
+  height: calc(100svh - 3.5rem);
 }
 
 .carto-explorer {
@@ -16,7 +16,7 @@
 
 @media (min-width: 768px) {
   .carto-viewport {
-    height: calc(100vh - 8rem);
-    height: calc(100svh - 8rem);
+    height: calc(100vh - 6rem);
+    height: calc(100svh - 6rem);
   }
 }

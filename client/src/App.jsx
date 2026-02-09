@@ -29,35 +29,35 @@ function App() {
       <Routes>
         {/* Global auth routes (no slug prefix) */}
         <Route path="/login" element={
-          <div className="pb-16 pt-16">
+          <div className="pb-10 pt-14">
             <Navbar />
             <LoginPage />
             <Footer />
           </div>
         } />
         <Route path="/register" element={
-          <div className="pb-16 pt-16">
+          <div className="pb-10 pt-14">
             <Navbar />
             <RegisterPage />
             <Footer />
           </div>
         } />
         <Route path="/confirm-email/:token" element={
-          <div className="pb-16 pt-16">
+          <div className="pb-10 pt-14">
             <Navbar />
             <ConfirmEmail />
             <Footer />
           </div>
         } />
         <Route path="/forgot-password" element={
-          <div className="pb-16 pt-16">
+          <div className="pb-10 pt-14">
             <Navbar />
             <RequestReset />
             <Footer />
           </div>
         } />
         <Route path="/reset-password/:token" element={
-          <div className="pb-16 pt-16">
+          <div className="pb-10 pt-14">
             <Navbar />
             <ResetPassword />
             <Footer />
@@ -66,7 +66,7 @@ function App() {
 
         {/* Root: DyTAEL chooser */}
         <Route path="/" element={
-          <div className="pb-16 pt-16">
+          <div className="pb-10 pt-14">
             <Navbar />
             <DytaelChooser />
             <Footer />

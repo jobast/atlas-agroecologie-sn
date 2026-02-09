@@ -2,6 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+const TopoBackground = () => (
+  <div
+    className="fixed inset-0 opacity-[0.05] pointer-events-none"
+    style={{
+      backgroundImage: 'url(/topo-bg.jpg)',
+      backgroundSize: '800px',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'repeat',
+    }}
+  />
+);
+
 export default function DytaelChooser() {
   const [dytaels, setDytaels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,50 +26,98 @@ export default function DytaelChooser() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Auto-redirect logged-in user to their DyTAEL
   useEffect(() => {
     if (loading) return;
     try {
       const user = JSON.parse(localStorage.getItem('user'));
       if (user?.dytael_slug) {
-        navigate(`/${user.dytael_slug}/map`, { replace: true });
+        navigate(`/${user.dytael_slug}`, { replace: true });
       }
     } catch (_) {}
   }, [loading, navigate]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Chargement...</p>
+      <div className="min-h-screen flex items-center justify-center bg-stone-50">
+        <div className="w-6 h-6 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto text-center mt-16 px-4">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Atlas des initiatives agroécologiques</h1>
-        <p className="text-gray-600 mb-8">Choisissez votre espace territorial</p>
-      </div>
+    <div className="min-h-screen bg-stone-50 flex flex-col relative overflow-hidden text-emerald-900">
+      <TopoBackground />
 
-      <div className="max-w-4xl mx-auto px-4 pb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {dytaels.map(d => (
-          <div
-            key={d.id}
-            onClick={() => navigate(`/${d.slug}`)}
-            className="cursor-pointer bg-white shadow-md rounded-lg p-6 hover:shadow-lg hover:bg-emerald-50 transition border border-gray-100"
-          >
-            <h3 className="text-lg font-bold text-emerald-800 mb-2">DyTAEL {d.name}</h3>
-            <p className="text-sm text-gray-600">{d.description || `Espace ${d.name}`}</p>
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-16 relative z-10">
+        {/* Header */}
+        <div className="text-center mb-14 max-w-xl">
+          <div className="inline-flex items-center gap-2 mb-5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/60">
+            <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+            </svg>
+            <span className="text-xs font-medium text-emerald-700 tracking-wide">Sénégal</span>
           </div>
-        ))}
+          <h1 className="text-3xl sm:text-4xl font-light text-stone-800 tracking-tight mb-3">
+            Atlas des initiatives agroécologiques
+          </h1>
+          <p className="text-sm text-stone-400 font-light leading-relaxed max-w-sm mx-auto">
+            Cartographie participative des acteurs de la transition agroécologique
+          </p>
+        </div>
 
-        <div
-          onClick={() => navigate('/national')}
-          className="cursor-pointer bg-white shadow-md rounded-lg p-6 hover:shadow-lg hover:bg-blue-50 transition border border-blue-100"
-        >
-          <h3 className="text-lg font-bold text-blue-800 mb-2">Vue nationale (DyTAES)</h3>
-          <p className="text-sm text-gray-600">Toutes les initiatives du Sénégal</p>
+        {/* National card - full width above */}
+        <div className="w-full max-w-2xl mb-4">
+          <button
+            onClick={() => navigate('/national')}
+            className="w-full text-left group bg-teal-800 rounded-2xl px-6 py-6 hover:bg-teal-700 transition-all duration-300 shadow-sm hover:shadow-md"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <svg className="w-4 h-4 text-teal-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+                  </svg>
+                  <span className="text-xs font-medium text-teal-300 uppercase tracking-wider">DyTAES</span>
+                </div>
+                <h3 className="text-xl font-medium text-white">Vue nationale</h3>
+                <p className="text-sm text-teal-200/70 mt-1">Toutes les initiatives agroécologiques du Sénégal</p>
+              </div>
+              <svg className="w-5 h-5 text-teal-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </div>
+          </button>
+        </div>
+
+        {/* DyTAEL cards - grid below */}
+        <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {dytaels.map(d => (
+            <button
+              key={d.id}
+              onClick={() => navigate(`/${d.slug}`)}
+              className="text-left group bg-white rounded-xl px-5 py-5 border border-stone-200/80 hover:border-emerald-300 hover:shadow-sm transition-all duration-200"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <svg className="w-3.5 h-3.5 text-stone-300 group-hover:text-emerald-500 transition-colors" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                    </svg>
+                    <span className="text-[10px] font-medium text-stone-400 uppercase tracking-wider">DyTAEL</span>
+                  </div>
+                  <h3 className="text-lg font-medium text-stone-800 group-hover:text-emerald-800 transition-colors">
+                    {d.name}
+                  </h3>
+                  <p className="text-xs text-stone-400 mt-0.5">{d.description || 'Espace territorial'}</p>
+                </div>
+                <svg className="w-4 h-4 text-stone-300 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
     </div>

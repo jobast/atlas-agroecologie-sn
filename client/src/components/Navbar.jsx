@@ -61,7 +61,6 @@ export default function Navbar() {
   const isAdmin = ['admin', 'dytael_admin', 'dytaes_admin'].includes(userRole);
   const isDytaesAdmin = userRole === 'dytaes_admin';
 
-  // Build slug-prefixed path
   const p = (path) => slug ? `/${slug}${path}` : path;
 
   const logout = () => {
@@ -80,130 +79,202 @@ export default function Navbar() {
     navigate(to);
   };
 
-  const navButton = (to, label, className = '') => (
-    <button
-      onClick={() => go(to)}
-      className={`text-sm text-white hover:text-emerald-100 transition-colors ${className}`}
-    >
-      {label}
-    </button>
-  );
+  const isActive = (path) => location.pathname === path;
 
-  // Dynamic title based on current DyTAEL
-  let titleText = 'Atlas des initiatives agroécologiques';
-  let titleShort = 'Atlas Agroécologie';
+  // Context subtitle
+  let subtitle = 'Sénégal';
   if (slug && slug !== 'national') {
-    const dytaelName = slug.charAt(0).toUpperCase() + slug.slice(1);
-    titleText = `Atlas Agroécologie — ${dytaelName}`;
-    titleShort = dytaelName;
-  } else if (slug === 'national') {
-    titleText = 'Atlas Agroécologie — National';
-    titleShort = 'DyTAES National';
+    subtitle = slug.charAt(0).toUpperCase() + slug.slice(1);
   }
 
-  return (
-    <nav className="bg-emerald-800 text-white shadow p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-50">
-      <div className="flex items-center gap-3 min-w-0">
-        <Link to="/" className="font-bold text-white hover:text-emerald-100 transition-colors truncate">
-          <span className="hidden sm:inline text-xl">{titleText}</span>
-          <span className="sm:hidden text-base">{titleShort}</span>
-        </Link>
-        <div className="hidden md:flex items-center gap-4 ml-4">
-          {navButton(p('/map'), 'Carte')}
-          {navButton(p('/table'), 'Tableau')}
-          {token && navButton(p('/my-initiatives'), 'Mes initiatives')}
-          {token && navButton(p('/submit'), 'Soumettre')}
-          {isAdmin && navButton(p('/admin'), 'Gérer les données')}
-          {isAdmin && navButton(p('/users'), 'Gérer les utilisateurs')}
-          {isAdmin && navButton(p('/form-fields'), 'Formulaire')}
-          {isDytaesAdmin && navButton('/national/dytaels', 'DyTAELs')}
-        </div>
-      </div>
-      <div className="hidden md:flex items-center gap-3">
-        {!token ? (
-          <>
-            <button
-              onClick={() => go('/register')}
-              className="text-sm underline text-white hover:text-emerald-100 transition-colors"
-            >
-              S'inscrire
-            </button>
-            <button
-              onClick={() => go('/login')}
-              className="bg-white/15 hover:bg-white/25 text-white text-sm px-3 py-1 rounded border border-white/20 transition-colors"
-            >
-              Connexion
-            </button>
-          </>
-        ) : (
-          <>
-            {userEmail && <span className="text-sm text-white/90">Connecté : {userEmail}</span>}
-            <button
-              onClick={logout}
-              className="bg-white/15 hover:bg-white/25 text-white text-sm px-3 py-1 rounded border border-white/20 transition-colors"
-            >
-              Déconnexion
-            </button>
-          </>
-        )}
-      </div>
+  // Nav items
+  const mainNav = [
+    { to: p('/map'), label: 'Carte' },
+    { to: p('/table'), label: 'Tableau' },
+  ];
+  const userNav = token ? [
+    { to: p('/submit'), label: 'Soumettre' },
+    { to: p('/my-initiatives'), label: 'Mes initiatives' },
+  ] : [];
+  const adminNav = isAdmin ? [
+    { to: p('/admin'), label: 'Données' },
+    { to: p('/users'), label: 'Utilisateurs' },
+    { to: p('/form-fields'), label: 'Formulaire' },
+    ...(isDytaesAdmin ? [{ to: '/national/dytaels', label: 'DyTAELs' }] : []),
+  ] : [];
 
-      <div className="md:hidden flex items-center gap-2">
+  const allNav = [...mainNav, ...userNav];
+
+  return (
+    <nav className="bg-white/90 backdrop-blur-md shadow-md fixed top-0 left-0 right-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+        {/* Left: brand + subtitle */}
+        <div className="flex items-center gap-3 min-w-0">
+          <Link to="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            <svg className="w-5 h-5 text-emerald-700 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+            </svg>
+            <div className="leading-tight">
+              <div className="font-medium text-stone-800 text-sm tracking-tight">Atlas Agroécologie</div>
+              {subtitle && (
+                <div className="text-[11px] font-light text-stone-400 tracking-wide">{subtitle}</div>
+              )}
+            </div>
+          </Link>
+        </div>
+
+        {/* Center: main nav (desktop) */}
+        <div className="hidden md:flex items-center gap-1">
+          {allNav.map(item => (
+            <button
+              key={item.to}
+              onClick={() => go(item.to)}
+              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+                isActive(item.to)
+                  ? 'text-emerald-800 bg-emerald-50 font-medium'
+                  : 'text-stone-500 hover:text-stone-800 hover:bg-stone-100'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+          {adminNav.length > 0 && (
+            <>
+              <span className="w-px h-4 bg-stone-200 mx-1" />
+              {adminNav.map(item => (
+                <button
+                  key={item.to}
+                  onClick={() => go(item.to)}
+                  className={`px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                    isActive(item.to)
+                      ? 'text-emerald-800 bg-emerald-50 font-medium'
+                      : 'text-stone-400 hover:text-stone-700 hover:bg-stone-100'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Right: auth (desktop) */}
+        <div className="hidden md:flex items-center gap-2">
+          {!token ? (
+            <>
+              <button
+                onClick={() => go('/login')}
+                className="text-sm text-stone-500 hover:text-stone-800 transition-colors"
+              >
+                Connexion
+              </button>
+              <button
+                onClick={() => go('/register')}
+                className="text-sm text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200/60 transition-colors"
+              >
+                S'inscrire
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-stone-400 truncate max-w-[160px]">{userEmail}</span>
+              <button
+                onClick={logout}
+                className="text-xs text-stone-400 hover:text-stone-600 transition-colors"
+              >
+                Déconnexion
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile: hamburger */}
         <button
           type="button"
           aria-label="Menu"
           onClick={() => setMenuOpen((v) => !v)}
-          className="px-3 py-2 rounded border border-white/20 bg-white/10 hover:bg-white/15"
+          className="md:hidden p-2 rounded-lg text-stone-500 hover:bg-stone-100 transition-colors"
         >
-          ☰
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+            {menuOpen ? (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            )}
+          </svg>
         </button>
       </div>
 
+      {/* Mobile menu */}
       {menuOpen && (
-        <div className="md:hidden fixed inset-0 z-40">
+        <div className="md:hidden fixed inset-0 z-40" style={{ top: '3.5rem' }}>
           <button
             type="button"
             aria-label="Fermer le menu"
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-black/20"
             onClick={() => setMenuOpen(false)}
           />
-          <div className="absolute top-16 left-0 right-0 bg-emerald-800 text-white shadow-lg border-t border-white/10 p-4 space-y-3">
-            <div className="flex flex-col gap-3">
-              {navButton(p('/map'), 'Carte', 'text-left')}
-              {navButton(p('/table'), 'Tableau', 'text-left')}
-              {token && navButton(p('/my-initiatives'), 'Mes initiatives', 'text-left')}
-              {token && navButton(p('/submit'), 'Soumettre', 'text-left')}
-              {isAdmin && navButton(p('/admin'), 'Gérer les données', 'text-left')}
-              {isAdmin && navButton(p('/users'), 'Gérer les utilisateurs', 'text-left')}
-              {isAdmin && navButton(p('/form-fields'), 'Formulaire', 'text-left')}
-              {isDytaesAdmin && navButton('/national/dytaels', 'DyTAELs', 'text-left')}
-            </div>
-            <div className="pt-3 border-t border-white/10 flex flex-col gap-3">
-              {!token ? (
-                <>
+          <div className="relative bg-white border-b border-stone-200 shadow-lg p-4 space-y-1">
+            {allNav.map(item => (
+              <button
+                key={item.to}
+                onClick={() => go(item.to)}
+                className={`block w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  isActive(item.to)
+                    ? 'text-emerald-800 bg-emerald-50 font-medium'
+                    : 'text-stone-600 hover:bg-stone-50'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+            {adminNav.length > 0 && (
+              <>
+                <div className="pt-2 mt-2 border-t border-stone-100">
+                  <span className="px-3 text-[10px] uppercase tracking-wider text-stone-400">Administration</span>
+                </div>
+                {adminNav.map(item => (
                   <button
-                    onClick={() => go('/register')}
-                    className="text-sm underline text-white hover:text-emerald-100 transition-colors text-left"
+                    key={item.to}
+                    onClick={() => go(item.to)}
+                    className={`block w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                      isActive(item.to)
+                        ? 'text-emerald-800 bg-emerald-50 font-medium'
+                        : 'text-stone-500 hover:bg-stone-50'
+                    }`}
                   >
-                    S'inscrire
+                    {item.label}
                   </button>
+                ))}
+              </>
+            )}
+            <div className="pt-3 mt-2 border-t border-stone-100">
+              {!token ? (
+                <div className="flex gap-2">
                   <button
                     onClick={() => go('/login')}
-                    className="bg-white/15 hover:bg-white/25 text-white text-sm px-3 py-2 rounded border border-white/20 transition-colors text-left"
+                    className="flex-1 text-sm text-stone-600 py-2.5 rounded-lg hover:bg-stone-50 transition-colors"
                   >
                     Connexion
                   </button>
-                </>
+                  <button
+                    onClick={() => go('/register')}
+                    className="flex-1 text-sm text-emerald-700 bg-emerald-50 py-2.5 rounded-lg border border-emerald-200/60 transition-colors"
+                  >
+                    S'inscrire
+                  </button>
+                </div>
               ) : (
-                <>
-                  {userEmail && <span className="text-sm text-white/90 truncate">Connecté : {userEmail}</span>}
+                <div className="flex items-center justify-between px-3">
+                  <span className="text-xs text-stone-400 truncate">{userEmail}</span>
                   <button
                     onClick={logout}
-                    className="bg-white/15 hover:bg-white/25 text-white text-sm px-3 py-2 rounded border border-white/20 transition-colors text-left"
+                    className="text-xs text-stone-400 hover:text-stone-600 transition-colors"
                   >
                     Déconnexion
                   </button>
-                </>
+                </div>
               )}
             </div>
           </div>

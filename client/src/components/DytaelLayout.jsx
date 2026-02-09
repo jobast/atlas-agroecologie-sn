@@ -28,7 +28,7 @@ function DytaelLayoutInner() {
   }
 
   return (
-    <div className="pb-16 pt-16">
+    <div className="pb-10 pt-14">
       <Navbar />
       <Outlet />
       <Footer />
