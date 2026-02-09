@@ -21,9 +21,16 @@ const parseExtra = (e) => {
   try { return JSON.parse(e); } catch (_) { return {}; }
 };
 
+const normalizeActivity = (a) => {
+  if (!a || typeof a !== 'string') return '';
+  let s = a.trim().replace(/_/g, ' ').replace(/\s+/g, ' ').replace(/,\s*$/, '');
+  if (s.toLowerCase() === 'other') s = 'Autres';
+  return s;
+};
+
 const parsePoint = (pt) => ({
   ...pt,
-  activities: parseActivities(pt.activities),
+  activities: parseActivities(pt.activities).map(normalizeActivity).filter(Boolean),
   extra_fields: parseExtra(pt.extra_fields),
   photos: pt.photos || []
 });
