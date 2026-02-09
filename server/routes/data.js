@@ -13,18 +13,28 @@ const router = express.Router();
 const uploadsDir = path.join(__dirname, '..', 'uploads', 'photos');
 fs.mkdirSync(uploadsDir, { recursive: true });
 
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),
   filename: (_req, file, cb) => {
     const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname) || '';
-    cb(null, `${unique}${ext}`);
+    const ext = path.extname(file.originalname).toLowerCase();
+    // Force a safe extension
+    const safeExt = ALLOWED_EXTENSIONS.includes(ext) ? ext : '.jpg';
+    cb(null, `${unique}${safeExt}`);
   }
 });
 
 const fileFilter = (_req, file, cb) => {
-  if (file.mimetype && file.mimetype.startsWith('image/')) cb(null, true);
-  else cb(new Error('Invalid file type'), false);
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (!file.mimetype || !file.mimetype.startsWith('image/')) {
+    return cb(new Error('Type de fichier non autorisé'), false);
+  }
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    return cb(new Error('Extension non autorisée'), false);
+  }
+  cb(null, true);
 };
 
 const upload = multer({
@@ -55,9 +65,7 @@ async function attachPhotos(rows, req) {
 
 // ✅ POST /api/data – Créer une nouvelle initiative
 router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) => {
-  console.log('––– 📩 Nouvelle requête POST /api/data –––');
-  console.log('✅ Champs reçus :', req.body);
-  console.log('📎 Fichiers reçus :', req.files);
+  console.log('POST /api/data — user:', req.user?.id, 'files:', req.files?.length || 0);
 
   const {
     initiative,
@@ -121,8 +129,20 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
     }
 
     const yearInt = Number.isNaN(parseInt(year)) ? null : parseInt(year);
+    if (yearInt !== null && (yearInt < 1900 || yearInt > 2100)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Année invalide (1900-2100).' });
+    }
     const latNum = parseFloat(lat);
     const lonNum = parseFloat(lon);
+    if (!Number.isNaN(latNum) && (latNum < -90 || latNum > 90)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Latitude invalide (-90 à 90).' });
+    }
+    if (!Number.isNaN(lonNum) && (lonNum < -180 || lonNum > 180)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Longitude invalide (-180 à 180).' });
+    }
 
     // Vérifier que l'utilisateur existe encore, sinon refuser la requête
     let userId = req.user?.id || null;

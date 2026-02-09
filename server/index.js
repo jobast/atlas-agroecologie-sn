@@ -1,7 +1,9 @@
 const path = require('path');
 const fs = require('fs');
 const express = require('express');
-const cors = require('cors'); // Middleware officiel
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const envProdPath = path.resolve(__dirname, '.env.production');
 const envDefaultPath = path.resolve(__dirname, '.env');
@@ -33,11 +35,32 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(helmet({
+  contentSecurityPolicy: false,  // désactivé pour ne pas casser le SPA
+  crossOriginEmbedderPolicy: false,
+}));
+app.use(express.json({ limit: '1mb' }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+  }
+}));
 
-
-
+// Rate limiters
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: { message: 'Trop de tentatives. Réessayez dans 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 5,
+  message: { message: 'Trop d\'inscriptions. Réessayez plus tard.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 
 
@@ -47,6 +70,10 @@ const users = require('./routes/users');
 const customFields = require('./routes/customFields');
 const dytaels = require('./routes/dytaels');
 
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', registerLimiter);
+app.use('/api/auth/request-reset', authLimiter);
+app.use('/api/auth/reset', authLimiter);
 app.use('/api/auth', auth);
 app.use('/api/data', data);
 app.use('/api/users', users);

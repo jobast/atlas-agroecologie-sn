@@ -28,6 +28,10 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ message: "Veuillez sélectionner un DyTAEL." });
   }
 
+  if (password.length < 8 || !/\d/.test(password)) {
+    return res.status(400).json({ message: "Le mot de passe doit contenir au moins 8 caractères et un chiffre." });
+  }
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.status(400).json({ message: "Email invalide" });
@@ -72,19 +76,23 @@ router.post('/register', async (req, res) => {
   } catch (err) {
     console.error('Erreur dans la route /register :', err);
     res.status(500).json({
-      message: "Erreur interne lors de l'inscription.",
-      error: err.message || 'Unknown error'
+      message: "Erreur interne lors de l'inscription."
     });
   }
 });
 
-// CONFIRMATION PAR EMAIL
+// CONFIRMATION PAR EMAIL (single-use: only works if not already confirmed)
 router.get('/confirm/:token', async (req, res) => {
   const token = req.params.token;
 
   try {
     const decoded = jwt.verify(token, SECRET);
     const userId = decoded.id;
+
+    // Check if already confirmed — prevents token replay
+    const [userRows] = await pool.query('SELECT confirmed FROM users WHERE id = ?', [userId]);
+    if (userRows.length === 0) return res.status(400).send('Utilisateur introuvable.');
+    if (userRows[0].confirmed) return res.send('Email déjà confirmé. Vous pouvez vous connecter.');
 
     await pool.query(
       'UPDATE users SET confirmed = true WHERE id = ?',
@@ -156,12 +164,14 @@ router.post('/request-reset', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: 'Email requis' });
   try {
-    const [rows] = await pool.query('SELECT id FROM users WHERE LOWER(email)=LOWER(?)', [email]);
+    const [rows] = await pool.query('SELECT id, password FROM users WHERE LOWER(email)=LOWER(?)', [email]);
     if (rows.length === 0) {
       return res.json({ message: 'Si le compte existe, un lien de réinitialisation a été envoyé.' });
     }
     const userId = rows[0].id;
-    const token = jwt.sign({ id: userId }, RESET_SECRET, { expiresIn: '1h' });
+    // Include password hash fingerprint so token is invalidated after use
+    const pwFingerprint = rows[0].password.slice(-10);
+    const token = jwt.sign({ id: userId, pwf: pwFingerprint }, RESET_SECRET, { expiresIn: '1h' });
     const { sendResetEmail } = require('../utils/mailer');
     await sendResetEmail(email, token);
     res.json({ message: 'Si le compte existe, un lien de réinitialisation a été envoyé.' });
@@ -189,6 +199,12 @@ router.post('/reset/:token', async (req, res) => {
   }
   try {
     const decoded = jwt.verify(token, RESET_SECRET);
+    // Verify token hasn't been used (password unchanged since token was issued)
+    const [userRows] = await pool.query('SELECT password FROM users WHERE id = ?', [decoded.id]);
+    if (userRows.length === 0) return res.status(400).json({ message: 'Utilisateur introuvable' });
+    if (decoded.pwf && userRows[0].password.slice(-10) !== decoded.pwf) {
+      return res.status(400).json({ message: 'Ce lien a déjà été utilisé.' });
+    }
     const hash = await bcrypt.hash(password, 10);
     await pool.query('UPDATE users SET password = ? WHERE id = ?', [hash, decoded.id]);
     res.json({ message: 'Mot de passe mis à jour' });
