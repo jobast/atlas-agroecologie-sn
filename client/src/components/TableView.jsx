@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import { useDytael } from '../context/DytaelContext';
+import { formatActorLabel, formatActivityLabel } from '../utils/labels';
 
 const parseActivities = (a) => {
   if (Array.isArray(a)) return a;
@@ -16,29 +18,6 @@ const parseExtra = (e) => {
   try { return JSON.parse(e); } catch (_) { return {}; }
 };
 
-const formatActorLabel = (value) => {
-  if (!value) return '—';
-  const lower = value.toLowerCase().replace(/_/g, ' ').trim();
-  if (lower.startsWith('entreprise')) return 'Entreprise';
-  if (lower.startsWith('groupement') || lower.includes('gie') || lower.includes('coopérative')) return 'Groupement';
-  if (lower.includes('ong') || lower.includes('association')) return 'ONG / Assoc.';
-  if (lower.includes('gouvern') || lower.includes('état') || lower.includes('public')) return 'Gouvernement';
-  if (lower.includes('recherche') || lower.includes('université')) return 'Recherche';
-  if (lower.includes('informel')) return 'Informel';
-  if (lower.includes('civile')) return 'Socité civile';
-  if (lower === 'other' || lower === 'autre') return 'Autre';
-  const clean = value.replace(/_/g, ' ');
-  return clean.charAt(0).toUpperCase() + clean.slice(1);
-};
-
-const formatActivityLabel = (value) => {
-  if (!value || typeof value !== 'string') return '';
-  const lower = value.toLowerCase();
-  if (lower === 'other') return 'Autres';
-  const clean = value.replace(/_/g, ' ').replace(/\s+/g, ' ').replace(/,\s*$/, '').trim();
-  return clean.charAt(0).toUpperCase() + clean.slice(1);
-};
-
 const activityBadgeClass = (a) => {
   if (!a) return 'bg-gray-100 text-gray-500';
   const key = a.toLowerCase();
@@ -51,6 +30,7 @@ const activityBadgeClass = (a) => {
 };
 
 export default function TableView() {
+  const { t } = useTranslation();
   const { currentDytael } = useDytael();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +39,87 @@ export default function TableView() {
   const [sortKey, setSortKey] = useState('initiative');
   const [sortDir, setSortDir] = useState('asc');
   const [expandedId, setExpandedId] = useState(null);
+
+  const columns = [
+    {
+      key: 'initiative',
+      label: t('table.initiative_col'),
+      render: (i) => (
+        <div className="max-w-[200px]">
+          <div className="font-semibold text-gray-800 truncate">
+            {i.initiative || '—'}
+            {i.children && i.children.length > 0 && (
+              <span className="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-50 text-purple-600">
+                Programme · {i.children.length}
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-gray-400 truncate mt-0.5">
+            {i.location_type === 'zone'
+              ? <span className="text-blue-500">Zone : {i.commune || i.village || ''}</span>
+              : (
+                <>
+                  {i.commune || i.village || ''}
+                  {i.locations && i.locations.length > 1 && (
+                    <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-600">
+                      +{i.locations.length - 1}
+                    </span>
+                  )}
+                </>
+              )
+            }
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'actor_type',
+      label: t('table.actor_type_col'),
+      className: 'hidden sm:table-cell',
+      render: (i) => <span className="text-gray-600 whitespace-nowrap">{formatActorLabel(i.actor_type)}</span>
+    },
+    {
+      key: 'activities',
+      label: t('table.activities_col'),
+      className: 'hidden md:table-cell',
+      render: (i) => (
+        <div className="flex flex-wrap gap-1 max-w-[220px]">
+          {(i.activities || []).length > 0
+            ? i.activities.slice(0, 3).map((a, idx) => (
+                <span key={idx} className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${activityBadgeClass(a)}`}>
+                  {formatActivityLabel(a)}
+                </span>
+              ))
+            : <span className="text-gray-400">—</span>
+          }
+          {(i.activities || []).length > 3 && (
+            <span className="text-xs text-gray-400">+{i.activities.length - 3}</span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'person_name',
+      label: t('table.contact_col'),
+      className: 'hidden lg:table-cell',
+      render: (i) => (
+        <div className="max-w-[160px]">
+          {i.person_name ? <div className="text-gray-700 truncate">{i.person_name}</div> : <span className="text-gray-400">—</span>}
+          {i.contact_phone && <div className="text-xs text-gray-400 truncate">{i.contact_phone}</div>}
+        </div>
+      )
+    },
+    {
+      key: 'website',
+      label: t('table.website_col'),
+      className: 'hidden lg:table-cell',
+      render: (i) => i.website ? (
+        <a href={i.website.startsWith('http') ? i.website : `https://${i.website}`} target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline text-xs truncate block max-w-[160px]">
+          {i.website.replace(/^https?:\/\//, '')}
+        </a>
+      ) : <span className="text-gray-400">—</span>
+    },
+  ];
 
   useEffect(() => {
     const params = new URLSearchParams({ status: 'approved' });
@@ -72,7 +133,7 @@ export default function TableView() {
         }));
         setItems(normalized);
       })
-      .catch(() => setError("Impossible de charger les initiatives."))
+      .catch(() => setError(t('common.load_error')))
       .finally(() => setLoading(false));
   }, [currentDytael]);
 
@@ -123,8 +184,8 @@ export default function TableView() {
       <div className="bg-white rounded-t-xl border border-gray-200 border-b-0">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-6 py-5">
           <div>
-            <h1 className="text-lg font-bold text-gray-800">Initiatives</h1>
-            <p className="text-xs text-gray-400 mt-0.5">{filtered.length} résultat{filtered.length !== 1 ? 's' : ''}</p>
+            <h1 className="text-lg font-bold text-gray-800">{t('table.title')}</h1>
+            <p className="text-xs text-gray-400 mt-0.5">{filtered.length} {filtered.length !== 1 ? t('common.result_plural') : t('common.result')}</p>
           </div>
           <div className="relative flex items-center">
             <span className="absolute left-3 text-gray-400 pointer-events-none">
@@ -134,7 +195,7 @@ export default function TableView() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher..."
+              placeholder={t('table.search')}
               className="border border-gray-200 rounded-lg pl-10 pr-8 py-2.5 text-sm bg-gray-100 placeholder-gray-400 w-full md:w-72 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 focus:bg-white transition-colors"
             />
             {search && (
@@ -150,7 +211,7 @@ export default function TableView() {
         </div>
       </div>
 
-      {loading && <div className="bg-white border border-gray-200 rounded-b-xl p-8 text-sm text-gray-400 text-center">Chargement...</div>}
+      {loading && <div className="bg-white border border-gray-200 rounded-b-xl p-8 text-sm text-gray-400 text-center">{t('common.loading')}</div>}
       {error && <div className="bg-white border border-gray-200 rounded-b-xl p-8 text-sm text-red-500 text-center">{error}</div>}
 
       {!loading && !error && (
@@ -199,18 +260,33 @@ export default function TableView() {
                         <tr className="bg-gray-50/50">
                           <td colSpan={columns.length + 1} className="px-5 py-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-3 text-sm">
-                              {i.description && <DetailItem label="Description" value={i.description} />}
-                              {i.zone_intervention && <DetailItem label="Zone d'intervention" value={i.zone_intervention} />}
-                              {i.person_name && <DetailItem label="Contact" value={i.person_name} />}
-                              {i.contact_phone && <DetailItem label="Téléphone" value={i.contact_phone} />}
-                              {i.contact_email && <DetailItem label="Email" value={i.contact_email} link={`mailto:${i.contact_email}`} />}
-                              {i.website && <DetailItem label="Site web" value={i.website.replace(/^https?:\/\//, '')} link={i.website.startsWith('http') ? i.website : `https://${i.website}`} />}
-                              {i.year && <DetailItem label="Année" value={i.year} />}
-                              {i.lat && i.lon && <DetailItem label="Coordonnées" value={`${i.lat}, ${i.lon}`} />}
+                              {i.description && <DetailItem label={t('table.description')} value={i.description} />}
+                              {i.zone_intervention && <DetailItem label={t('table.zone_intervention')} value={i.zone_intervention} />}
+                              {i.person_name && <DetailItem label={t('table.contact')} value={i.person_name} />}
+                              {i.contact_phone && <DetailItem label={t('table.phone')} value={i.contact_phone} />}
+                              {i.contact_email && <DetailItem label={t('table.email')} value={i.contact_email} link={`mailto:${i.contact_email}`} />}
+                              {i.website && <DetailItem label={t('table.website')} value={i.website.replace(/^https?:\/\//, '')} link={i.website.startsWith('http') ? i.website : `https://${i.website}`} />}
+                              {i.year && <DetailItem label={t('table.year')} value={i.year} />}
+                              {i.lat && i.lon && <DetailItem label={t('table.coordinates')} value={`${i.lat}, ${i.lon}`} />}
                               {i.extra_fields && Object.keys(i.extra_fields).length > 0 && (
                                 Object.entries(i.extra_fields).map(([k, v]) => v ? <DetailItem key={k} label={k} value={v} /> : null)
                               )}
                             </div>
+                            {i.locations && i.locations.length > 1 && (
+                              <div className="mt-4 pt-4 border-t border-gray-200">
+                                <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">{t('table.locations_count', { count: i.locations.length })}</div>
+                                <div className="space-y-1.5">
+                                  {i.locations.map((loc, idx) => (
+                                    <div key={loc.id || idx} className="flex items-center gap-2 text-sm text-gray-600">
+                                      <span className={`w-2 h-2 rounded-full shrink-0 ${loc.is_primary ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                                      <span className="font-medium">{loc.label || t('table.location_n', { n: idx + 1 })}</span>
+                                      {loc.commune && <span className="text-gray-400">— {loc.commune}</span>}
+                                      {loc.lat && loc.lon && <span className="text-gray-300 text-xs">({loc.lat}, {loc.lon})</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       )}
@@ -221,7 +297,7 @@ export default function TableView() {
                   <tr>
                     <td colSpan={columns.length + 1} className="px-5 py-12 text-center">
                       <svg className="w-10 h-10 mx-auto text-gray-300 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                      <p className="text-gray-400">Aucune initiative trouvée.</p>
+                      <p className="text-gray-400">{t('table.no_initiatives')}</p>
                     </td>
                   </tr>
                 )}
@@ -246,63 +322,3 @@ function DetailItem({ label, value, link }) {
     </div>
   );
 }
-
-const columns = [
-  {
-    key: 'initiative',
-    label: 'Initiative',
-    render: (i) => (
-      <div className="max-w-[200px]">
-        <div className="font-semibold text-gray-800 truncate">{i.initiative || '—'}</div>
-        <div className="text-xs text-gray-400 truncate mt-0.5">{i.commune || i.village || ''}</div>
-      </div>
-    )
-  },
-  {
-    key: 'actor_type',
-    label: "Type d'acteur",
-    className: 'hidden sm:table-cell',
-    render: (i) => <span className="text-gray-600 whitespace-nowrap">{formatActorLabel(i.actor_type)}</span>
-  },
-  {
-    key: 'activities',
-    label: 'Activités',
-    className: 'hidden md:table-cell',
-    render: (i) => (
-      <div className="flex flex-wrap gap-1 max-w-[220px]">
-        {(i.activities || []).length > 0
-          ? i.activities.slice(0, 3).map((a, idx) => (
-              <span key={idx} className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${activityBadgeClass(a)}`}>
-                {formatActivityLabel(a)}
-              </span>
-            ))
-          : <span className="text-gray-400">—</span>
-        }
-        {(i.activities || []).length > 3 && (
-          <span className="text-xs text-gray-400">+{i.activities.length - 3}</span>
-        )}
-      </div>
-    )
-  },
-  {
-    key: 'person_name',
-    label: 'Contact',
-    className: 'hidden lg:table-cell',
-    render: (i) => (
-      <div className="max-w-[160px]">
-        {i.person_name ? <div className="text-gray-700 truncate">{i.person_name}</div> : <span className="text-gray-400">—</span>}
-        {i.contact_phone && <div className="text-xs text-gray-400 truncate">{i.contact_phone}</div>}
-      </div>
-    )
-  },
-  {
-    key: 'website',
-    label: 'Site web',
-    className: 'hidden lg:table-cell',
-    render: (i) => i.website ? (
-      <a href={i.website.startsWith('http') ? i.website : `https://${i.website}`} target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline text-xs truncate block max-w-[160px]">
-        {i.website.replace(/^https?:\/\//, '')}
-      </a>
-    ) : <span className="text-gray-400">—</span>
-  },
-];

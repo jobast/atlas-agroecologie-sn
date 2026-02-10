@@ -1,27 +1,29 @@
-import React, { useState } from 'react';
-
-const ACTIVITIES = [
-  { key: 'production', label: 'Production' },
-  { key: 'transformation', label: 'Transformation' },
-  { key: 'commercialisation', label: 'Commercialisation' },
-  { key: 'formation', label: 'Formation' },
-  { key: 'plaidoyer', label: 'Plaidoyer' },
-  { key: 'autre', label: 'Autre' },
-  { key: 'informel', label: 'Informel' }
-];
-
-const ACTOR_TYPES = [
-  { key: 'ONG', label: 'ONG' },
-  { key: 'recherche', label: 'Recherche' },
-  { key: 'gouvernement', label: 'Gouvernement' },
-  { key: 'groupement', label: 'Groupement' },
-  { key: 'entreprise', label: 'Entreprise' },
-  { key: 'informel', label: 'Informel' },
-  { key: 'autre', label: 'Autre' }
-];
+import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function FilterPanel({ selectedActivities, onActivitiesChange, selectedCommunes, onCommunesChange, selectedActorTypes, onActorTypesChange }) {
+  const { t } = useTranslation();
   const [filterType, setFilterType] = useState('');
+
+  const ACTIVITIES = useMemo(() => [
+    { key: 'production', label: t('activities.production') },
+    { key: 'transformation', label: t('activities.transformation') },
+    { key: 'commercialisation', label: t('activities.commercialisation') },
+    { key: 'formation', label: t('activities.formation') },
+    { key: 'plaidoyer', label: t('activities.plaidoyer') },
+    { key: 'autre', label: t('activities.autre') },
+    { key: 'informel', label: t('actors.informel') }
+  ], [t]);
+
+  const ACTOR_TYPES = useMemo(() => [
+    { key: 'ONG', label: t('actors.ong') },
+    { key: 'recherche', label: t('actors.recherche') },
+    { key: 'gouvernement', label: t('actors.gouvernement') },
+    { key: 'groupement', label: t('actors.groupement') },
+    { key: 'entreprise', label: t('actors.entreprise') },
+    { key: 'informel', label: t('actors.informel') },
+    { key: 'autre', label: t('actors.autre') }
+  ], [t]);
 
   const handleToggleActivity = (key) => {
     if (selectedActivities.includes(key)) {
@@ -48,16 +50,16 @@ export default function FilterPanel({ selectedActivities, onActivitiesChange, se
   return (
     <div className="space-y-4">
       <div>
-        <label htmlFor="filterType" className="font-semibold mb-2 block">Sélectionner par :</label>
+        <label htmlFor="filterType" className="font-semibold mb-2 block">{t('filters.select_by')}</label>
         <select
           id="filterType"
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
           className="w-full border border-gray-300 rounded px-2 py-1"
         >
-          <option value="activities">Activités</option>
-          <option value="communes">Communes</option>
-          <option value="actor_types">Type d'acteur</option>
+          <option value="activities">{t('filters.activities')}</option>
+          <option value="communes">{t('filters.communes')}</option>
+          <option value="actor_types">{t('filters.actor_type')}</option>
         </select>
       </div>
 
@@ -81,12 +83,12 @@ export default function FilterPanel({ selectedActivities, onActivitiesChange, se
 
       {filterType === 'communes' && (
         <div>
-          <h3 className="font-semibold mb-2">Communes</h3>
+          <h3 className="font-semibold mb-2">{t('filters.communes')}</h3>
           <input
             type="text"
             value={selectedCommunes.join(', ')}
             onChange={handleCommunesChange}
-            placeholder="Entrez les communes, séparées par des virgules"
+            placeholder={t('filters.communes_placeholder')}
             className="w-full border border-gray-300 rounded px-2 py-1"
           />
         </div>
@@ -94,7 +96,7 @@ export default function FilterPanel({ selectedActivities, onActivitiesChange, se
 
       {filterType === 'actor_types' && (
         <div>
-          <h3 className="font-semibold mb-2">Types d'acteur</h3>
+          <h3 className="font-semibold mb-2">{t('filters.actor_type')}</h3>
           <div className="space-y-2">
             {ACTOR_TYPES.map(({ key, label }) => (
               <label key={key} className="flex items-center space-x-2 cursor-pointer">

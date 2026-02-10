@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapContainer, TileLayer, useMap, Marker, Popup } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
@@ -38,12 +39,13 @@ function FitBounds({ points }) {
 }
 
 function FullExtentControl({ className = '' }) {
+  const { t } = useTranslation();
   const map = useMap();
   return (
     <button
       type="button"
-      aria-label="Vue globale"
-      title="Vue globale"
+      aria-label={t('map.global_view')}
+      title={t('map.global_view')}
       onClick={() => map.fitBounds(initialBounds, { padding: [20, 20] })}
       className={`bg-white rounded shadow border border-gray-200 text-gray-700 hover:bg-gray-50 active:bg-gray-100 w-9 h-9 flex items-center justify-center ${className}`}
     >
@@ -71,6 +73,7 @@ function Recenter({ points, selectedId, focusPoint }) {
 }
 
 export default function MapView({ points = [], selectedId, onSelect, basemap, setBasemap, focusPoint, activeActivities = [], bounds: propBounds }) {
+  const { t } = useTranslation();
   const initialBounds = propBounds || DEFAULT_BOUNDS;
   const mapRef = useRef();
   const [localBasemap, setLocalBasemap] = useState(basemap || 'streets');
@@ -116,8 +119,8 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
         <div className="m-2 flex flex-col gap-2 items-end">
           <button
             type="button"
-            aria-label={`Fond: ${basemapLabel[currentBasemap]}`}
-            title={`Fond: ${basemapLabel[currentBasemap]}`}
+            aria-label={t('map.basemap_label', { name: basemapLabel[currentBasemap] })}
+            title={t('map.basemap_label', { name: basemapLabel[currentBasemap] })}
             onClick={() => {
               const idx = basemapOrder.indexOf(currentBasemap);
               const next = basemapOrder[(idx + 1) % basemapOrder.length];
@@ -169,7 +172,7 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
             });
             return (
               <Marker
-                key={pt.id}
+                key={pt._locId || pt.id}
                 position={[pt.latNum, pt.lonNum]}
                 icon={icon}
                 eventHandlers={{ click: () => onSelect?.(pt.id, pt) }}
@@ -178,8 +181,17 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
                   <div className="-mx-3 -my-2">
                     {/* Header */}
                     <div className="bg-emerald-700 px-6 py-5">
-                      <h3 className="font-semibold text-white text-base leading-snug">{pt.initiative || 'Sans nom'}</h3>
-                      <div className="text-emerald-200 text-sm mt-1.5">{pt.actor_type || 'Type non renseigné'}</div>
+                      <h3 className="font-semibold text-white text-base leading-snug">{pt.initiative || t('common.unnamed')}</h3>
+                      <div className="text-emerald-200 text-sm mt-1.5">{pt.actor_type || t('map.type_not_provided')}</div>
+                      {pt._locLabel && (
+                        <div className="text-emerald-100 text-xs mt-1">{pt._locLabel}</div>
+                      )}
+                      {pt._totalLocations > 1 && (
+                        <div className="text-emerald-200/70 text-xs mt-0.5">{t('map.locations_for_initiative', { count: pt._totalLocations })}</div>
+                      )}
+                      {pt.parent && (
+                        <div className="text-emerald-100 text-xs mt-1">{t('map.part_of', { name: pt.parent.initiative })}</div>
+                      )}
                     </div>
                     {/* Body */}
                     <div className="px-6 py-5 space-y-5">
@@ -194,7 +206,7 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
                       {/* Location */}
                       <div className="flex items-center gap-3 text-gray-700 text-sm">
                         <svg className="w-[18px] h-[18px] shrink-0 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        <span>{pt.commune || pt.village || 'Localisation inconnue'}</span>
+                        <span>{pt.commune || pt.village || t('map.unknown_location')}</span>
                       </div>
                       {/* Website */}
                       {pt.website && (

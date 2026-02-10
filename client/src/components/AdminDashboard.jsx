@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useDytael } from '../context/DytaelContext';
+import { formatActorLabel, formatActivityLabel, statusConfig } from '../utils/labels';
 
 const parseMaybeJson = (value, fallback) => {
   if (value === null || value === undefined || value === '') return fallback;
@@ -11,21 +13,6 @@ const parseMaybeJson = (value, fallback) => {
   } catch (_) {
     return fallback;
   }
-};
-
-const statusConfig = {
-  pending: { label: 'En attente', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-400' },
-  approved: { label: 'Validée', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', dot: 'bg-green-400' },
-  rejected: { label: 'Rejetée', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-400' },
-  delete_requested: { label: 'Suppression', bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200', dot: 'bg-gray-400' },
-};
-
-const formatActivityLabel = (value) => {
-  if (!value || typeof value !== 'string') return '';
-  const lower = value.toLowerCase();
-  if (lower === 'other') return 'Autres';
-  const clean = value.replace(/_/g, ' ').replace(/\s+/g, ' ').replace(/,\s*$/, '').trim();
-  return clean.charAt(0).toUpperCase() + clean.slice(1);
 };
 
 const activityBadgeClass = (a) => {
@@ -39,22 +26,8 @@ const activityBadgeClass = (a) => {
   return 'bg-gray-50 text-gray-600';
 };
 
-const formatActorLabel = (value) => {
-  if (!value) return '—';
-  const lower = value.toLowerCase().replace(/_/g, ' ').trim();
-  if (lower.startsWith('entreprise')) return 'Entreprise';
-  if (lower.startsWith('groupement') || lower.includes('gie') || lower.includes('coopérative')) return 'Groupement';
-  if (lower.includes('ong') || lower.includes('association')) return 'ONG / Assoc.';
-  if (lower.includes('gouvern') || lower.includes('état') || lower.includes('public')) return 'Gouvernement';
-  if (lower.includes('recherche') || lower.includes('université')) return 'Recherche';
-  if (lower.includes('informel')) return 'Informel';
-  if (lower.includes('civile')) return 'Socité civile';
-  if (lower === 'other' || lower === 'autre') return 'Autre';
-  const clean = value.replace(/_/g, ' ');
-  return clean.charAt(0).toUpperCase() + clean.slice(1);
-};
-
 export default function AdminDashboard() {
+  const { t } = useTranslation();
   const { slug } = useParams();
   const { currentDytael, isNational } = useDytael();
   const [items, setItems] = useState([]);
@@ -88,9 +61,9 @@ export default function AdminDashboard() {
       } catch (err) {
         console.error('Erreur chargement données', err);
         if (err.response?.status === 403) {
-          setError("Accès réservé à l'administration.");
+          setError(t('admin.access_denied'));
         } else {
-          setError("Impossible de charger les données.");
+          setError(t('admin.load_error'));
         }
       } finally {
         setLoading(false);
@@ -130,7 +103,7 @@ export default function AdminDashboard() {
       updateStatusLocally(ids, 'approved');
     } catch (err) {
       console.error('Erreur validation', err);
-      setError("Validation impossible pour le moment.");
+      setError(t('admin.validate_error'));
     }
   };
 
@@ -146,7 +119,7 @@ export default function AdminDashboard() {
       updateStatusLocally(ids, 'rejected');
     } catch (err) {
       console.error('Erreur rejet', err);
-      setError("Rejet impossible pour le moment.");
+      setError(t('admin.reject_error'));
     }
   };
 
@@ -184,11 +157,13 @@ export default function AdminDashboard() {
     return base;
   }, [items]);
 
+  const sc = statusConfig();
+
   if (loading) return (
     <div className="mx-4 md:mx-8 my-6">
       <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
         <div className="inline-block w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-sm text-gray-400">Chargement...</p>
+        <p className="text-sm text-gray-400">{t('common.loading')}</p>
       </div>
     </div>
   );
@@ -204,17 +179,17 @@ export default function AdminDashboard() {
 
       {/* Header */}
       <div className="bg-white rounded-xl border border-gray-200 px-6 py-5">
-        <h1 className="text-lg font-bold text-gray-800">Tableau de bord</h1>
-        <p className="text-xs text-gray-400 mt-0.5">{isNational ? 'Vue nationale' : currentDytael?.name || ''} — Gestion des initiatives</p>
+        <h1 className="text-lg font-bold text-gray-800">{t('admin.dashboard')}</h1>
+        <p className="text-xs text-gray-400 mt-0.5">{isNational ? t('admin.national_view') : currentDytael?.name || ''} — {t('admin.initiative_management')}</p>
       </div>
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { key: 'total', label: 'Total', value: stats.total, color: 'text-gray-800', accent: 'bg-gray-100' },
-          { key: 'pending', label: 'En attente', value: stats.pending || 0, color: 'text-amber-600', accent: 'bg-amber-50' },
-          { key: 'approved', label: 'Validées', value: stats.approved || 0, color: 'text-emerald-600', accent: 'bg-emerald-50' },
-          { key: 'rejected', label: 'Rejetées', value: stats.rejected || 0, color: 'text-red-600', accent: 'bg-red-50' },
+          { key: 'total', label: t('admin.total'), value: stats.total, color: 'text-gray-800', accent: 'bg-gray-100' },
+          { key: 'pending', label: sc.pending.label, value: stats.pending || 0, color: 'text-amber-600', accent: 'bg-amber-50' },
+          { key: 'approved', label: t('status.approved_plural'), value: stats.approved || 0, color: 'text-emerald-600', accent: 'bg-emerald-50' },
+          { key: 'rejected', label: t('status.rejected_plural'), value: stats.rejected || 0, color: 'text-red-600', accent: 'bg-red-50' },
         ].map(card => (
           <button
             key={card.key}
@@ -245,7 +220,7 @@ export default function AdminDashboard() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher par nom, lieu, contact, activité..."
+                placeholder={t('admin.search_placeholder')}
                 className="w-full border border-gray-200 rounded-lg pl-10 pr-8 py-2.5 text-sm bg-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 focus:bg-white transition-colors"
               />
               {search && (
@@ -264,19 +239,19 @@ export default function AdminDashboard() {
                 onChange={(e) => setSortBy(e.target.value)}
                 className="border border-gray-200 rounded-lg bg-gray-100 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 focus:bg-white transition-colors"
               >
-                <option value="newest">Plus récentes</option>
-                <option value="oldest">Plus anciennes</option>
-                <option value="name">Nom A→Z</option>
+                <option value="newest">{t('admin.sort_newest')}</option>
+                <option value="oldest">{t('admin.sort_oldest')}</option>
+                <option value="name">{t('admin.sort_name')}</option>
               </select>
-              <span className="text-xs text-gray-400 whitespace-nowrap">{filtered.length} résultat{filtered.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-gray-400 whitespace-nowrap">{filtered.length > 1 ? t('common.results_count_plural', { count: filtered.length }) : t('common.results_count', { count: filtered.length })}</span>
             </div>
           </div>
           {/* Status filter pills */}
           <div className="flex flex-wrap items-center gap-2">
             {['all', 'pending', 'approved', 'rejected', 'delete_requested'].map(status => {
               const conf = status === 'all'
-                ? { label: 'Tous', bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' }
-                : statusConfig[status];
+                ? { label: t('common.all'), bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' }
+                : sc[status];
               return (
                 <button
                   key={status}
@@ -298,26 +273,26 @@ export default function AdminDashboard() {
         {/* Bulk actions */}
         {selectedIds.length > 0 && (
           <div className="border-t border-gray-100 px-5 py-3 bg-emerald-50/50 flex items-center gap-3">
-            <span className="text-sm text-gray-600 font-medium">{selectedIds.length} sélectionné{selectedIds.length !== 1 ? 's' : ''}</span>
+            <span className="text-sm text-gray-600 font-medium">{selectedIds.length > 1 ? t('common.selected_plural', { count: selectedIds.length }) : t('common.selected', { count: selectedIds.length })}</span>
             <button
               onClick={() => handleValidate(selectedIds)}
               className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-              Valider
+              {t('common.validate')}
             </button>
             <button
               onClick={() => handleReject(selectedIds)}
               className="inline-flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-              Rejeter
+              {t('common.reject')}
             </button>
             <button
               onClick={() => setSelectedIds([])}
               className="text-sm text-gray-500 hover:text-gray-700 ml-auto transition-colors"
             >
-              Annuler
+              {t('common.cancel')}
             </button>
           </div>
         )}
@@ -342,12 +317,12 @@ export default function AdminDashboard() {
                     )}
                   </div>
                 </th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Initiative</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Acteur</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Activités</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Statut</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Date</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Actions</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('admin.initiative_col')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">{t('admin.actor_col')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">{t('admin.activities_col')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('admin.status_col')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">{t('admin.date_col')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">{t('admin.actions_col')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -355,11 +330,11 @@ export default function AdminDashboard() {
                 <tr>
                   <td colSpan="8" className="px-5 py-12 text-center">
                     <svg className="w-10 h-10 mx-auto text-gray-300 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-                    <p className="text-gray-400">Aucune initiative{filterStatus !== 'all' ? ' avec ce statut' : ''}.</p>
+                    <p className="text-gray-400">{filterStatus !== 'all' ? t('admin.no_initiatives_status') : t('admin.no_initiatives')}.</p>
                   </td>
                 </tr>
               ) : filtered.map((i) => {
-                const sc = statusConfig[i.status] || statusConfig.pending;
+                const rowSc = sc[i.status] || sc.pending;
                 const isExpanded = expandedId === i.id;
                 return (
                   <React.Fragment key={i.id}>
@@ -389,8 +364,37 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-5 py-3.5 align-top">
                         <div className="max-w-[200px]">
-                          <div className="font-semibold text-gray-800 truncate">{i.initiative || 'Sans nom'}</div>
-                          <div className="text-xs text-gray-400 truncate mt-0.5">{i.village || i.commune || 'Lieu inconnu'}</div>
+                          <div className="font-semibold text-gray-800 truncate">
+                            {i.initiative || t('common.unnamed')}
+                            {i.children && i.children.length > 0 && (
+                              <span className="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-50 text-purple-600">
+                                {t('admin.programme_badge', { count: i.children.length })}
+                              </span>
+                            )}
+                            {i.parent && (
+                              <span className="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-500">
+                                {t('admin.sub_initiative')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-400 truncate mt-0.5">
+                            {i.location_type === 'zone'
+                              ? <span className="text-blue-500">{t('admin.zone_label', { location: i.commune || i.village || t('admin.zone_not_specified') })}</span>
+                              : (
+                                <>
+                                  {i.village || i.commune || t('common.unknown_location')}
+                                  {i.locations && i.locations.length > 1 && (
+                                    <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-600">
+                                      +{i.locations.length - 1}
+                                    </span>
+                                  )}
+                                </>
+                              )
+                            }
+                            {i.parent && (
+                              <span className="ml-1 text-gray-300">({i.parent.initiative})</span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-5 py-3.5 align-top hidden md:table-cell">
@@ -404,7 +408,7 @@ export default function AdminDashboard() {
                                   {formatActivityLabel(a)}
                                 </span>
                               ))
-                            : <span className="text-gray-400">—</span>
+                            : <span className="text-gray-400">{t('common.none')}</span>
                           }
                           {(i.activities || []).length > 2 && (
                             <span className="text-xs text-gray-400">+{i.activities.length - 2}</span>
@@ -412,19 +416,19 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                       <td className="px-5 py-3.5 align-top">
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${sc.bg} ${sc.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                          {sc.label}
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${rowSc.bg} ${rowSc.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${rowSc.dot}`} />
+                          {rowSc.label}
                         </span>
                       </td>
                       <td className="px-5 py-3.5 align-top hidden sm:table-cell">
-                        <span className="text-xs text-gray-400">{i.created_at ? new Date(i.created_at).toLocaleDateString('fr-FR') : '—'}</span>
+                        <span className="text-xs text-gray-400">{i.created_at ? new Date(i.created_at).toLocaleDateString('fr-FR') : t('common.none')}</span>
                       </td>
                       <td className="px-3 py-3.5 align-top">
                         <div className="flex items-center gap-1">
                           <Link
                             to={`/${slug}/edit/${i.id}`}
-                            title="Modifier"
+                            title={t('common.edit')}
                             className="w-7 h-7 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
                           >
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -433,7 +437,7 @@ export default function AdminDashboard() {
                             <button
                               type="button"
                               onClick={() => handleValidate([i.id])}
-                              title="Valider"
+                              title={t('common.validate')}
                               className="w-7 h-7 rounded-full flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors"
                             >
                               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
@@ -442,7 +446,7 @@ export default function AdminDashboard() {
                           <button
                             type="button"
                             onClick={() => handleReject([i.id])}
-                            title="Rejeter"
+                            title={t('common.reject')}
                             className="w-7 h-7 rounded-full flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors"
                           >
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -464,12 +468,27 @@ export default function AdminDashboard() {
                             {i.lat && i.lon && <DetailItem label="Coordonnées" value={`${i.lat}, ${i.lon}`} />}
                             {i.social_media?.length > 0 && <DetailItem label="Réseaux sociaux" value={i.social_media.map(s => `${s.platform}: ${s.url}`).join(', ')} />}
                             {i.videos?.length > 0 && <DetailItem label="Vidéos" value={i.videos.filter(Boolean).join(', ')} />}
-                            <DetailItem label="ID utilisateur" value={i.user_id || '—'} />
-                            <DetailItem label="Créé le" value={i.created_at ? new Date(i.created_at).toLocaleString('fr-FR') : '—'} />
+                            <DetailItem label="ID utilisateur" value={i.user_id || t('common.none')} />
+                            <DetailItem label="Créé le" value={i.created_at ? new Date(i.created_at).toLocaleString('fr-FR') : t('common.none')} />
                             {i.extra_fields && Object.keys(i.extra_fields).length > 0 && (
                               Object.entries(i.extra_fields).map(([k, v]) => v ? <DetailItem key={k} label={k} value={v} /> : null)
                             )}
                           </div>
+                          {i.locations && i.locations.length > 1 && (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                              <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">{t('admin.locations_count', { count: i.locations.length })}</div>
+                              <div className="space-y-1.5">
+                                {i.locations.map((loc, idx) => (
+                                  <div key={loc.id || idx} className="flex items-center gap-2 text-sm text-gray-600">
+                                    <span className={`w-2 h-2 rounded-full shrink-0 ${loc.is_primary ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                                    <span className="font-medium">{loc.label || `Lieu ${idx + 1}`}</span>
+                                    {loc.commune && <span className="text-gray-400">— {loc.commune}</span>}
+                                    {loc.lat && loc.lon && <span className="text-gray-300 text-xs">({loc.lat}, {loc.lon})</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           {i.photos && i.photos.length > 0 && (
                             <div className="mt-4">
                               <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">Photos</div>
@@ -482,27 +501,56 @@ export default function AdminDashboard() {
                               </div>
                             </div>
                           )}
+                          {i.parent && (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">{t('admin.parent_programme')}</div>
+                              <Link to={`/${slug}/programme/${i.parent.id}`} className="text-sm text-emerald-700 hover:underline font-medium">{i.parent.initiative}</Link>
+                            </div>
+                          )}
+                          {i.children && i.children.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                              <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">{t('admin.sub_initiatives_count', { count: i.children.length })}</div>
+                              <div className="space-y-1.5">
+                                {i.children.map(child => (
+                                  <div key={child.id} className="flex items-center gap-2 text-sm text-gray-600">
+                                    <span className={`w-2 h-2 rounded-full shrink-0 ${(sc[child.status] || sc.pending).dot}`} />
+                                    <span className="font-medium">{child.initiative}</span>
+                                    {child.commune && <span className="text-gray-400">— {child.commune}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                              <Link to={`/${slug}/programme/${i.id}`} className="inline-block mt-2 text-xs text-emerald-700 hover:underline font-medium">{t('admin.view_programme')}</Link>
+                            </div>
+                          )}
                           <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
                             <Link
                               to={`/${slug}/edit/${i.id}`}
                               className="inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors"
                             >
                               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                              Modifier
+                              {t('common.edit')}
                             </Link>
+                            {i.children && i.children.length > 0 && (
+                              <Link
+                                to={`/${slug}/programme/${i.id}`}
+                                className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-200 hover:bg-purple-100 text-purple-700 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                              >
+                                Programme
+                              </Link>
+                            )}
                             <button
                               onClick={() => handleValidate([i.id])}
                               className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors"
                             >
                               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                              Valider
+                              {t('common.validate')}
                             </button>
                             <button
                               onClick={() => handleReject([i.id])}
                               className="inline-flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors"
                             >
                               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                              Rejeter
+                              {t('common.reject')}
                             </button>
                           </div>
                         </td>

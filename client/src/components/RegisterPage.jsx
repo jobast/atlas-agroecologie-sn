@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -17,6 +18,7 @@ export default function RegisterPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     axios.get(`${import.meta.env.VITE_API_URL}/dytaels`)
@@ -30,23 +32,23 @@ export default function RegisterPage() {
   setLoading(true);
 
   if (email !== confirmEmail) {
-    setErrorMessage("Les adresses e-mail ne correspondent pas.");
+    setErrorMessage(t('auth.email_mismatch'));
     setLoading(false);
     return;
   }
   if (password !== confirmPassword) {
-    setErrorMessage("Les mots de passe ne correspondent pas.");
+    setErrorMessage(t('auth.password_mismatch'));
     setLoading(false);
     return;
   }
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    setErrorMessage("L'adresse email n'est pas valide.");
+    setErrorMessage(t('auth.email_invalid'));
     setLoading(false);
     return;
   }
   if (password.length < 8 || !/\d/.test(password)) {
-    setErrorMessage("Le mot de passe doit contenir au moins 8 caractères et un chiffre.");
+    setErrorMessage(t('auth.password_rules'));
     setLoading(false);
     return;
   }
@@ -74,7 +76,7 @@ export default function RegisterPage() {
     }
 
     const msg = error.response?.data?.error || error.response?.data?.message;
-    setErrorMessage(msg || "Erreur inattendue. Veuillez réessayer plus tard.");
+    setErrorMessage(msg || t('auth.register_error'));
   } finally {
     setLoading(false);
   }
@@ -85,17 +87,17 @@ if (registered) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="max-w-md w-full bg-white p-8 rounded shadow-md text-center">
-        <h2 className="text-2xl font-bold mb-4">Inscription enregistrée</h2>
+        <h2 className="text-2xl font-bold mb-4">{t('auth.registration_done')}</h2>
         <p className="mb-6">
-          Un e-mail de confirmation vient de vous être envoyé.
+          {t('auth.registration_email_sent')}
           <br />
-          Si vous ne le trouvez pas, regardez dans votre dossier&nbsp;spams.
+          {t('auth.check_spam')}
         </p>
         <button
           onClick={() => navigate('/')}
           className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition"
         >
-          Retour à l&apos;accueil
+          {t('auth.back_home')}
         </button>
       </div>
     </div>
@@ -106,7 +108,7 @@ if (registered) {
 return (
   <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
     <div className="max-w-md w-full bg-white p-8 rounded shadow-md">
-      <h2 className="text-2xl font-bold mb-6 text-center">Créer un compte</h2>
+      <h2 className="text-2xl font-bold mb-6 text-center">{t('auth.register_title')}</h2>
       {errorMessage && (
         <div
           aria-live="polite"
@@ -117,21 +119,21 @@ return (
       )}
       <form onSubmit={handleRegister} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700">DyTAEL *</label>
+          <label className="block text-sm font-medium text-gray-700">{t('auth.dytael_label')}</label>
           <select
             value={dytaelId}
             onChange={e => setDytaelId(e.target.value)}
             required
             className="mt-1 block w-full border border-gray-300 rounded px-3 py-2"
           >
-            <option value="">-- Sélectionner votre DyTAEL --</option>
+            <option value="">{t('auth.select_dytael')}</option>
             {dytaels.map(d => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Prénom</label>
+          <label className="block text-sm font-medium text-gray-700">{t('auth.first_name')}</label>
           <input
             type="text"
             value={name}
@@ -141,7 +143,7 @@ return (
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Nom de famille</label>
+          <label className="block text-sm font-medium text-gray-700">{t('auth.last_name')}</label>
           <input
             type="text"
             value={surname}
@@ -151,7 +153,7 @@ return (
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Organisation (optionnel)</label>
+          <label className="block text-sm font-medium text-gray-700">{t('auth.organization_optional')}</label>
           <input
             type="text"
             value={organization}
@@ -160,7 +162,7 @@ return (
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Téléphone</label>
+          <label className="block text-sm font-medium text-gray-700">{t('auth.phone')}</label>
           <input
             type="text"
             value={phone}
@@ -170,7 +172,7 @@ return (
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Email</label>
+          <label className="block text-sm font-medium text-gray-700">{t('auth.email')}</label>
           <input
             type="email"
             value={email}
@@ -180,7 +182,7 @@ return (
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Confirmer l’email</label>
+          <label className="block text-sm font-medium text-gray-700">{t('auth.confirm_email')}</label>
           <input
             type="email"
             value={confirmEmail}
@@ -190,7 +192,7 @@ return (
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Mot de passe</label>
+          <label className="block text-sm font-medium text-gray-700">{t('auth.password')}</label>
           <input
             type="password"
             value={password}
@@ -200,7 +202,7 @@ return (
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Confirmer le mot de passe</label>
+          <label className="block text-sm font-medium text-gray-700">{t('auth.confirm_password')}</label>
           <input
             type="password"
             value={confirmPassword}
@@ -214,12 +216,12 @@ return (
           disabled={loading}
           className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition disabled:opacity-50"
         >
-          {loading ? 'Inscription en cours…' : "S'inscrire"}
+          {loading ? t('auth.registering') : t('auth.register_button')}
         </button>
       </form>
       <div className="mt-4 text-center text-sm">
-        Déjà un compte ?{' '}
-        <a href="/login" className="text-green-600 hover:underline">Se connecter</a>
+        {t('auth.already_account')}{' '}
+        <a href="/login" className="text-green-600 hover:underline">{t('auth.login_button')}</a>
       </div>
     </div>
   </div>

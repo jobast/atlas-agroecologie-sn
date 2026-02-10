@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function SearchBar({ value, onChange, suggestions = [], onSelect }) {
+  const { t } = useTranslation();
   const [local, setLocal] = useState(value || '');
 
   useEffect(() => { setLocal(value || ''); }, [value]);
@@ -18,7 +20,7 @@ export default function SearchBar({ value, onChange, suggestions = [], onSelect 
         </span>
         <input
           type="text"
-          placeholder="Rechercher..."
+          placeholder={t('common.search')}
           value={local}
           onChange={(e) => { setLocal(e.target.value); onChange(e.target.value); }}
           className="w-full border border-gray-200 rounded-lg pl-10 pr-8 py-2.5 text-sm bg-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 focus:bg-white transition-colors"

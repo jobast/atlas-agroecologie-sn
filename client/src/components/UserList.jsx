@@ -1,19 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import EditUser from './EditUser';
 
-const roleConfig = {
-  editor: { label: 'Éditeur', bg: 'bg-gray-50', text: 'text-gray-600' },
-  dytael_admin: { label: 'Admin DyTAEL', bg: 'bg-emerald-50', text: 'text-emerald-700' },
-  admin: { label: 'Admin DyTAEL', bg: 'bg-emerald-50', text: 'text-emerald-700' },
-  dytaes_admin: { label: 'Admin DyTAES', bg: 'bg-purple-50', text: 'text-purple-700' },
-};
-
 export default function UserList() {
+  const { t } = useTranslation();
   const [users, setUsers] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+
+  const roleConfig = {
+    editor: { label: t('users.role_editor'), bg: 'bg-gray-50', text: 'text-gray-600' },
+    dytael_admin: { label: t('users.role_dytael_admin'), bg: 'bg-emerald-50', text: 'text-emerald-700' },
+    admin: { label: t('users.role_dytael_admin'), bg: 'bg-emerald-50', text: 'text-emerald-700' },
+    dytaes_admin: { label: t('users.role_dytaes_admin'), bg: 'bg-purple-50', text: 'text-purple-700' },
+  };
 
   const loadUsers = async () => {
     const token = localStorage.getItem('token');
@@ -66,8 +68,8 @@ export default function UserList() {
       {/* Header */}
       <div className="bg-white rounded-xl border border-gray-200 px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-lg font-bold text-gray-800">Utilisateurs</h1>
-          <p className="text-xs text-gray-400 mt-0.5">{filtered.length} utilisateur{filtered.length !== 1 ? 's' : ''}</p>
+          <h1 className="text-lg font-bold text-gray-800">{t('users.title')}</h1>
+          <p className="text-xs text-gray-400 mt-0.5">{filtered.length > 1 ? t('users.users_count_plural', { count: filtered.length }) : t('users.users_count', { count: filtered.length })}</p>
         </div>
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
@@ -77,7 +79,7 @@ export default function UserList() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher..."
+            placeholder={t('users.search')}
             className="border border-gray-200 rounded-lg pl-10 pr-8 py-2.5 text-sm bg-gray-100 placeholder-gray-400 w-full sm:w-72 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 focus:bg-white transition-colors"
           />
           {search && (
@@ -95,12 +97,12 @@ export default function UserList() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-3 py-3 w-8"></th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Utilisateur</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Rôle</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">DyTAEL</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Statut</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Inscription</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Actions</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('users.user_col')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">{t('users.role_col')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">{t('users.dytael_col')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">{t('users.status_col')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">{t('users.registration_col')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">{t('users.actions_col')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -108,7 +110,7 @@ export default function UserList() {
                 <tr>
                   <td colSpan="7" className="px-5 py-12 text-center">
                     <svg className="w-10 h-10 mx-auto text-gray-300 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    <p className="text-gray-400">Aucun utilisateur trouvé.</p>
+                    <p className="text-gray-400">{t('users.no_users')}</p>
                   </td>
                 </tr>
               ) : filtered.map((u) => {
@@ -136,30 +138,30 @@ export default function UserList() {
                         <span className={`inline-block text-xs px-2.5 py-1 rounded-full font-medium ${rc.bg} ${rc.text}`}>{rc.label}</span>
                       </td>
                       <td className="px-5 py-3.5 align-top hidden lg:table-cell">
-                        <span className="text-gray-600">{u.dytael_name || '—'}</span>
+                        <span className="text-gray-600">{u.dytael_name || t('common.none')}</span>
                       </td>
                       <td className="px-5 py-3.5 align-top hidden sm:table-cell">
                         {u.confirmed ? (
                           <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 text-green-700">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                            Confirmé
+                            {t('status.confirmed')}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                            En attente
+                            {t('status.pending')}
                           </span>
                         )}
                       </td>
                       <td className="px-5 py-3.5 align-top hidden lg:table-cell">
-                        <span className="text-xs text-gray-400">{u.created_at ? new Date(u.created_at).toLocaleDateString('fr-FR') : '—'}</span>
+                        <span className="text-xs text-gray-400">{u.created_at ? new Date(u.created_at).toLocaleDateString('fr-FR') : t('common.none')}</span>
                       </td>
                       <td className="px-3 py-3.5 align-top">
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
                             onClick={() => setEditingUser(u)}
-                            title="Modifier"
+                            title={t('common.edit')}
                             className="w-7 h-7 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
                           >
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -168,7 +170,7 @@ export default function UserList() {
                             <button
                               type="button"
                               onClick={() => validateUser(u.id)}
-                              title="Valider"
+                              title={t('common.validate')}
                               className="w-7 h-7 rounded-full flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors"
                             >
                               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
@@ -177,9 +179,9 @@ export default function UserList() {
                           <button
                             type="button"
                             onClick={() => {
-                              if (window.confirm(`Supprimer l'utilisateur ${u.email} ?`)) deleteUser(u.id);
+                              if (window.confirm(t('users.confirm_delete', { email: u.email }))) deleteUser(u.id);
                             }}
-                            title="Supprimer"
+                            title={t('common.delete')}
                             className="w-7 h-7 rounded-full flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors"
                           >
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -191,15 +193,15 @@ export default function UserList() {
                       <tr className="bg-gray-50/50">
                         <td colSpan="7" className="px-5 py-5">
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-3 text-sm">
-                            <DetailItem label="Email" value={u.email} />
-                            <DetailItem label="Prénom" value={u.name || '—'} />
-                            <DetailItem label="Nom" value={u.surname || '—'} />
-                            <DetailItem label="Téléphone" value={u.phone || '—'} />
-                            <DetailItem label="Organisation" value={u.organization || '—'} />
-                            <DetailItem label="Rôle" value={rc.label} />
-                            <DetailItem label="DyTAEL" value={u.dytael_name || '—'} />
-                            <DetailItem label="Inscription" value={u.created_at ? new Date(u.created_at).toLocaleString('fr-FR') : '—'} />
-                            <DetailItem label="Dernier login" value={u.last_login ? new Date(u.last_login).toLocaleString('fr-FR') : '—'} />
+                            <DetailItem label={t('users.email')} value={u.email} />
+                            <DetailItem label={t('users.first_name')} value={u.name || t('common.none')} />
+                            <DetailItem label={t('users.last_name')} value={u.surname || t('common.none')} />
+                            <DetailItem label={t('users.phone')} value={u.phone || t('common.none')} />
+                            <DetailItem label={t('users.organization')} value={u.organization || t('common.none')} />
+                            <DetailItem label={t('users.role')} value={rc.label} />
+                            <DetailItem label={t('users.dytael_col')} value={u.dytael_name || t('common.none')} />
+                            <DetailItem label={t('users.registration_col')} value={u.created_at ? new Date(u.created_at).toLocaleString('fr-FR') : t('common.none')} />
+                            <DetailItem label={t('users.last_login')} value={u.last_login ? new Date(u.last_login).toLocaleString('fr-FR') : t('common.none')} />
                           </div>
                         </td>
                       </tr>
@@ -217,7 +219,7 @@ export default function UserList() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="font-bold text-gray-800">Modifier l'utilisateur</h3>
+              <h3 className="font-bold text-gray-800">{t('users.edit_user')}</h3>
               <button type="button" onClick={() => setEditingUser(null)} className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
               </button>

@@ -1,18 +1,9 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatActorLabel } from '../utils/labels';
 
 // Charte Sahel / CREATES : vert nature, beige sable, bleu eau, rouge latérite, turquoise
 const ACTOR_COLORS = ['#059669','#c2956b','#0891b2','#b5451b','#14b8a6','#4d7c0f','#d4a853','#1d4ed8','#92400e','#10b981'];
-
-const formatLabel = (value) => {
-  if (!value) return 'Non renseigné';
-  if (typeof value !== 'string') return String(value);
-  const lower = value.toLowerCase();
-  if (lower.includes('civile')) return 'Socité civile';
-  if (lower.startsWith('entreprise')) return 'Entreprise';
-  if (lower === 'other' || lower === 'autre') return 'Autre';
-  const replaced = value.replace(/_/g, ' ');
-  return replaced.charAt(0).toUpperCase() + replaced.slice(1);
-};
 
 function groupSmall(entries, threshold = 10) {
   const sorted = [...entries].sort((a, b) => b[1] - a[1]);
@@ -37,6 +28,7 @@ const activityBarColor = (value) => {
 };
 
 export default function Sidebar({ stats, variant = 'overlay' }) {
+  const { t } = useTranslation();
   const [hoveredActor, setHoveredActor] = useState(null);
   const [showActivityDetails, setShowActivityDetails] = useState(false);
 
@@ -48,7 +40,7 @@ export default function Sidebar({ stats, variant = 'overlay' }) {
 
   const actorSegments = actorEntries.map(([k, v]) => ({
     key: k,
-    label: formatLabel(k),
+    label: formatActorLabel(k),
     value: v
   }));
 
@@ -76,14 +68,14 @@ export default function Sidebar({ stats, variant = 'overlay' }) {
           <div className="px-5 pt-5 pb-4">
             <div className="text-center">
               <div className="text-3xl font-bold text-emerald-700 tabular-nums">{stats?.total ?? 0}</div>
-              <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Initiatives</div>
+              <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">{t('sidebar.initiatives')}</div>
             </div>
           </div>
 
           {/* Actors — interactive donut */}
           {stats?.actors && (
             <div className="px-5 py-4 border-t border-gray-100">
-              <h4 className="font-semibold text-gray-700 text-xs uppercase tracking-wide mb-4">Type d'acteurs</h4>
+              <h4 className="font-semibold text-gray-700 text-xs uppercase tracking-wide mb-4">{t('sidebar.actor_types')}</h4>
               <div className="flex justify-center mb-4">
                 <svg viewBox="0 0 42 42" className="w-36 h-36">
                   <circle cx="21" cy="21" r="15.915" fill="none" stroke="#f3f4f6" strokeWidth="9" />
@@ -119,7 +111,7 @@ export default function Sidebar({ stats, variant = 'overlay' }) {
                         {actorTotal}
                       </text>
                       <text x="21" y="24" textAnchor="middle" className="fill-gray-400 text-[2.5px]">
-                        total
+                        {t('sidebar.total')}
                       </text>
                     </>
                   )}
@@ -147,12 +139,12 @@ export default function Sidebar({ stats, variant = 'overlay' }) {
           {/* Activities with mini bars */}
           {stats?.activities && (
             <div className="px-5 py-4 border-t border-gray-100">
-              <h4 className="font-semibold text-gray-700 text-xs uppercase tracking-wide mb-3">Activités</h4>
+              <h4 className="font-semibold text-gray-700 text-xs uppercase tracking-wide mb-3">{t('sidebar.activities')}</h4>
               <div className="space-y-2.5">
                 {activityMain.map(([k, v]) => (
                   <div key={k}>
                     <div className="flex justify-between items-baseline mb-1">
-                      <span className="text-sm text-gray-700">{formatLabel(k)}</span>
+                      <span className="text-sm text-gray-700">{formatActorLabel(k)}</span>
                       <span className="text-sm font-semibold tabular-nums text-gray-800">{v}</span>
                     </div>
                     <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -175,7 +167,7 @@ export default function Sidebar({ stats, variant = 'overlay' }) {
                     >
                       <span className="flex items-center gap-1.5 text-sm text-gray-400">
                         <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${showActivityDetails ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-                        Autre
+                        {t('common.other')}
                       </span>
                       <span className="text-sm font-semibold tabular-nums text-gray-800">{activitySmallTotal}</span>
                     </button>
@@ -183,7 +175,7 @@ export default function Sidebar({ stats, variant = 'overlay' }) {
                       <div className="ml-5 mt-2 space-y-1.5">
                         {activitySmall.map(([k, v]) => (
                           <div key={k} className="flex justify-between text-xs text-gray-400">
-                            <span>{formatLabel(k)}</span>
+                            <span>{formatActorLabel(k)}</span>
                             <span className="font-medium text-gray-500 tabular-nums">{v}</span>
                           </div>
                         ))}

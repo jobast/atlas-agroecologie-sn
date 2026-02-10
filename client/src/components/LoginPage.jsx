@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -8,6 +9,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -41,7 +43,7 @@ export default function LoginPage() {
       if (err.response?.data?.message) {
         setError(err.response.data.message);
       } else {
-        setError("Une erreur est survenue. Vérifiez votre connexion ou réessayez plus tard.");
+        setError(t('auth.login_error'));
       }
     } finally {
       setLoading(false);
@@ -51,10 +53,10 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="max-w-md w-full bg-white p-8 rounded shadow-md">
-        <h2 className="text-2xl font-bold mb-6 text-center">Connexion</h2>
+        <h2 className="text-2xl font-bold mb-6 text-center">{t('auth.login_title')}</h2>
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Email</label>
+            <label className="block text-sm font-medium text-gray-700">{t('auth.email')}</label>
             <input
               type="email"
               required
@@ -65,7 +67,7 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Mot de passe</label>
+            <label className="block text-sm font-medium text-gray-700">{t('auth.password')}</label>
             <input
               type="password"
               required
@@ -91,17 +93,17 @@ export default function LoginPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                 </svg>
-                Connexion...
+                {t('auth.logging_in')}
               </span>
-            ) : "Se connecter"}
+            ) : t('auth.login_button')}
           </button>
         </form>
         <div className="mt-4 text-center text-sm">
-          Pas encore de compte ?{' '}
-          <a href="/register" className="text-blue-600 hover:underline">Créer un compte</a>
+          {t('auth.no_account')}{' '}
+          <a href="/register" className="text-blue-600 hover:underline">{t('auth.create_account')}</a>
         </div>
         <div className="mt-2 text-center text-sm">
-          <a href="/forgot-password" className="text-blue-600 hover:underline">Mot de passe oublié ?</a>
+          <a href="/forgot-password" className="text-blue-600 hover:underline">{t('auth.forgot_password')}</a>
         </div>
       </div>
     </div>

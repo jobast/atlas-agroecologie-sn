@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 export default function RequestReset() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
@@ -12,9 +14,9 @@ export default function RequestReset() {
     setStatus('');
     try {
       await axios.post(`${import.meta.env.VITE_API_URL}/auth/request-reset`, { email });
-      setStatus('Si ce compte existe, un email a été envoyé.');
+      setStatus(t('reset_password.email_sent'));
     } catch (_) {
-      setStatus('Si ce compte existe, un email a été envoyé.');
+      setStatus(t('reset_password.email_sent'));
     } finally {
       setLoading(false);
     }
@@ -23,9 +25,9 @@ export default function RequestReset() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="max-w-md w-full bg-white p-8 rounded shadow">
-        <h2 className="text-2xl font-bold mb-4 text-center">Mot de passe oublié</h2>
+        <h2 className="text-2xl font-bold mb-4 text-center">{t('reset_password.title')}</h2>
         <p className="text-sm text-gray-600 mb-4">
-          Saisissez votre email, un lien de réinitialisation vous sera envoyé.
+          {t('reset_password.description')}
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
@@ -41,7 +43,7 @@ export default function RequestReset() {
             disabled={loading}
             className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:opacity-50"
           >
-            {loading ? 'Envoi…' : 'Envoyer le lien'}
+            {loading ? t('common.sending') : t('common.send_link')}
           </button>
         </form>
         {status && (

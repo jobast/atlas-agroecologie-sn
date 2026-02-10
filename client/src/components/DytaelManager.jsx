@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 const inputClasses = 'w-full border border-gray-200 rounded-lg bg-gray-100 px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 focus:bg-white transition-colors';
 
 export default function DytaelManager() {
+  const { t } = useTranslation();
   const [dytaels, setDytaels] = useState([]);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
@@ -39,7 +41,7 @@ export default function DytaelManager() {
 
   const handleSave = async () => {
     if (!form.name || !form.slug || !form.bounds_sw_lat || !form.bounds_sw_lon || !form.bounds_ne_lat || !form.bounds_ne_lon) {
-      showMessage('Tous les champs obligatoires doivent être remplis.', 'error');
+      showMessage(t('dytael_manager.required_error'), 'error');
       return;
     }
     try {
@@ -47,17 +49,17 @@ export default function DytaelManager() {
         await axios.put(`${import.meta.env.VITE_API_URL}/dytaels/${editing}`, form, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        showMessage('DyTAEL mis à jour.');
+        showMessage(t('dytael_manager.updated'));
       } else {
         await axios.post(`${import.meta.env.VITE_API_URL}/dytaels`, form, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        showMessage('DyTAEL créé.');
+        showMessage(t('dytael_manager.created'));
       }
       resetForm();
       load();
     } catch (err) {
-      showMessage(err.response?.data?.error || 'Erreur lors de la sauvegarde.', 'error');
+      showMessage(err.response?.data?.error || t('dytael_manager.save_error'), 'error');
     }
   };
 
@@ -78,15 +80,15 @@ export default function DytaelManager() {
   };
 
   const handleDeactivate = async (id) => {
-    if (!window.confirm('Désactiver ce DyTAEL ?')) return;
+    if (!window.confirm(t('dytael_manager.confirm_deactivate'))) return;
     try {
       await axios.delete(`${import.meta.env.VITE_API_URL}/dytaels/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      showMessage('DyTAEL désactivé.');
+      showMessage(t('dytael_manager.deactivated'));
       load();
     } catch (err) {
-      showMessage('Erreur lors de la désactivation.', 'error');
+      showMessage(t('dytael_manager.deactivate_error'), 'error');
     }
   };
 
@@ -94,8 +96,8 @@ export default function DytaelManager() {
     <div className="mx-4 md:mx-8 my-6 max-w-4xl space-y-6">
       {/* Header */}
       <div className="bg-white rounded-xl border border-gray-200 px-6 py-5">
-        <h1 className="text-lg font-bold text-gray-800">Gestion des DyTAELs</h1>
-        <p className="text-xs text-gray-400 mt-0.5">{dytaels.length} DyTAEL{dytaels.length !== 1 ? 's' : ''} enregistré{dytaels.length !== 1 ? 's' : ''}</p>
+        <h1 className="text-lg font-bold text-gray-800">{t('dytael_manager.title')}</h1>
+        <p className="text-xs text-gray-400 mt-0.5">{dytaels.length > 1 ? t('dytael_manager.dytaels_count_plural', { count: dytaels.length }) : t('dytael_manager.dytaels_count', { count: dytaels.length })}</p>
       </div>
 
       {message && (
@@ -112,26 +114,26 @@ export default function DytaelManager() {
       {/* Create/Edit form */}
       <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">
-          {editing ? 'Modifier le DyTAEL' : 'Nouveau DyTAEL'}
+          {editing ? t('dytael_manager.edit_dytael') : t('dytael_manager.new_dytael')}
         </h3>
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom <span className="text-red-400">*</span></label>
-              <input placeholder="Ex: Bignona" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={inputClasses} />
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('dytael_manager.name')} <span className="text-red-400">*</span></label>
+              <input placeholder={t('dytael_manager.name_placeholder')} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={inputClasses} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Slug (URL) <span className="text-red-400">*</span></label>
-              <input placeholder="Ex: bignona" value={form.slug} onChange={e => setForm({ ...form, slug: e.target.value })} className={inputClasses} />
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('dytael_manager.slug')} <span className="text-red-400">*</span></label>
+              <input placeholder={t('dytael_manager.slug_placeholder')} value={form.slug} onChange={e => setForm({ ...form, slug: e.target.value })} className={inputClasses} />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
-            <input placeholder="Description courte" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={inputClasses} />
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('dytael_manager.description')}</label>
+            <input placeholder={t('dytael_manager.description_placeholder')} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={inputClasses} />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Limites géographiques <span className="text-red-400">*</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-3">{t('dytael_manager.geo_bounds')} <span className="text-red-400">*</span></label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Lat SW</label>
@@ -154,7 +156,7 @@ export default function DytaelManager() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Zoom par défaut</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('dytael_manager.default_zoom')}</label>
               <input type="number" placeholder="10" value={form.default_zoom} onChange={e => setForm({ ...form, default_zoom: parseInt(e.target.value) || 10 })} className={inputClasses} />
             </div>
           </div>
@@ -164,18 +166,18 @@ export default function DytaelManager() {
               {editing ? (
                 <>
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                  Mettre à jour
+                  {t('common.update')}
                 </>
               ) : (
                 <>
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
-                  Créer
+                  {t('common.create')}
                 </>
               )}
             </button>
             {editing && (
               <button onClick={resetForm} className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">
-                Annuler
+                {t('common.cancel')}
               </button>
             )}
           </div>
@@ -185,12 +187,12 @@ export default function DytaelManager() {
       {/* DyTAEL list */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">DyTAELs existants</span>
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('dytael_manager.existing_dytaels')}</span>
         </div>
         {dytaels.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <svg className="w-10 h-10 mx-auto text-gray-300 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <p className="text-gray-400">Aucun DyTAEL enregistré.</p>
+            <p className="text-gray-400">{t('dytael_manager.no_dytaels')}</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
@@ -200,9 +202,9 @@ export default function DytaelManager() {
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-gray-800">{d.name}</span>
                     <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">/{d.slug}</span>
-                    {d.active === false && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">Inactif</span>}
+                    {d.active === false && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">{t('dytael_manager.inactive')}</span>}
                   </div>
-                  <div className="text-sm text-gray-500 mt-0.5">{d.description || 'Pas de description'}</div>
+                  <div className="text-sm text-gray-500 mt-0.5">{d.description || t('dytael_manager.no_description')}</div>
                   <div className="text-xs text-gray-400 mt-1">
                     Bounds: [{d.bounds_sw_lat}, {d.bounds_sw_lon}] → [{d.bounds_ne_lat}, {d.bounds_ne_lon}] · Zoom: {d.default_zoom}
                   </div>
@@ -213,14 +215,14 @@ export default function DytaelManager() {
                     className="inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    Modifier
+                    {t('common.edit')}
                   </button>
                   <button
                     onClick={() => handleDeactivate(d.id)}
                     className="inline-flex items-center gap-1.5 bg-white border border-red-200 hover:bg-red-50 text-red-600 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                    Désactiver
+                    {t('dytael_manager.deactivate')}
                   </button>
                 </div>
               </div>

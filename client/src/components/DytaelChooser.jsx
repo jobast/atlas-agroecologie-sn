@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 
 const TopoBackground = () => (
@@ -18,6 +19,7 @@ export default function DytaelChooser() {
   const [dytaels, setDytaels] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     axios.get(`${import.meta.env.VITE_API_URL}/dytaels`)
@@ -56,13 +58,13 @@ export default function DytaelChooser() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
             </svg>
-            <span className="text-xs font-medium text-emerald-700 tracking-wide">Sénégal</span>
+            <span className="text-xs font-medium text-emerald-700 tracking-wide">{t('landing.senegal')}</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-light text-stone-800 tracking-tight mb-3">
-            Atlas des initiatives agroécologiques
+            {t('chooser.atlas_title')}
           </h1>
           <p className="text-sm text-stone-400 font-light leading-relaxed max-w-sm mx-auto">
-            Cartographie participative des acteurs de la transition agroécologique
+            {t('chooser.subtitle')}
           </p>
         </div>
 
@@ -80,8 +82,8 @@ export default function DytaelChooser() {
                   </svg>
                   <span className="text-xs font-medium text-teal-300 uppercase tracking-wider">DyTAES</span>
                 </div>
-                <h3 className="text-xl font-medium text-white">Vue nationale</h3>
-                <p className="text-sm text-teal-200/70 mt-1">Toutes les initiatives agroécologiques du Sénégal</p>
+                <h3 className="text-xl font-medium text-white">{t('chooser.national_view')}</h3>
+                <p className="text-sm text-teal-200/70 mt-1">{t('chooser.national_desc')}</p>
               </div>
               <svg className="w-5 h-5 text-teal-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
@@ -110,7 +112,7 @@ export default function DytaelChooser() {
                   <h3 className="text-lg font-medium text-stone-800 group-hover:text-emerald-800 transition-colors">
                     {d.name}
                   </h3>
-                  <p className="text-xs text-stone-400 mt-0.5">{d.description || 'Espace territorial'}</p>
+                  <p className="text-xs text-stone-400 mt-0.5">{d.description || t('chooser.territorial_space')}</p>
                 </div>
                 <svg className="w-4 h-4 text-stone-300 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />

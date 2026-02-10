@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export default function Navbar() {
   const [userRole, setUserRole] = useState(null);
   const [userEmail, setUserEmail] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { t, i18n } = useTranslation();
 
   const syncAuthFromStorage = () => {
     const storedUser = localStorage.getItem('user');
@@ -79,6 +81,11 @@ export default function Navbar() {
     navigate(to);
   };
 
+  const toggleLang = () => {
+    const newLang = i18n.language === 'fr' ? 'wo' : 'fr';
+    i18n.changeLanguage(newLang);
+  };
+
   const isActive = (path) => location.pathname === path;
 
   // Context subtitle
@@ -89,18 +96,18 @@ export default function Navbar() {
 
   // Nav items
   const mainNav = [
-    { to: p('/map'), label: 'Carte' },
-    { to: p('/table'), label: 'Tableau' },
+    { to: p('/map'), label: t('nav.map') },
+    { to: p('/table'), label: t('nav.table') },
   ];
   const userNav = token ? [
-    { to: p('/submit'), label: 'Soumettre' },
-    { to: p('/my-initiatives'), label: 'Mes initiatives' },
+    { to: p('/submit'), label: t('nav.submit') },
+    { to: p('/my-initiatives'), label: t('nav.my_initiatives') },
   ] : [];
   const adminNav = isAdmin ? [
-    { to: p('/admin'), label: 'Données' },
-    { to: p('/users'), label: 'Utilisateurs' },
-    { to: p('/form-fields'), label: 'Formulaire' },
-    ...(isDytaesAdmin ? [{ to: '/national/dytaels', label: 'DyTAELs' }] : []),
+    { to: p('/admin'), label: t('nav.data') },
+    { to: p('/users'), label: t('nav.users') },
+    { to: p('/form-fields'), label: t('nav.form') },
+    ...(isDytaesAdmin ? [{ to: '/national/dytaels', label: t('nav.dytaels') }] : []),
   ] : [];
 
   const allNav = [...mainNav, ...userNav];
@@ -116,7 +123,7 @@ export default function Navbar() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
             </svg>
             <div className="leading-tight">
-              <div className="font-medium text-stone-800 text-sm tracking-tight">Atlas Agroécologie</div>
+              <div className="font-medium text-stone-800 text-sm tracking-tight">{t('nav.atlas_agroecologie')}</div>
               {subtitle && (
                 <div className="text-[11px] font-light text-stone-400 tracking-wide">{subtitle}</div>
               )}
@@ -161,19 +168,25 @@ export default function Navbar() {
 
         {/* Right: auth (desktop) */}
         <div className="hidden md:flex items-center gap-2">
+          <button
+            onClick={toggleLang}
+            className="text-xs font-medium text-stone-500 hover:text-emerald-700 bg-stone-100 hover:bg-emerald-50 px-2 py-1 rounded-md transition-colors"
+          >
+            {i18n.language === 'fr' ? 'WO' : 'FR'}
+          </button>
           {!token ? (
             <>
               <button
                 onClick={() => go('/login')}
                 className="text-sm text-stone-500 hover:text-stone-800 transition-colors"
               >
-                Connexion
+                {t('nav.login')}
               </button>
               <button
                 onClick={() => go('/register')}
                 className="text-sm text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200/60 transition-colors"
               >
-                S'inscrire
+                {t('nav.register')}
               </button>
             </>
           ) : (
@@ -183,7 +196,7 @@ export default function Navbar() {
                 onClick={logout}
                 className="text-xs text-stone-400 hover:text-stone-600 transition-colors"
               >
-                Déconnexion
+                {t('nav.logout')}
               </button>
             </div>
           )}
@@ -211,7 +224,7 @@ export default function Navbar() {
         <div className="md:hidden fixed inset-0 z-40" style={{ top: '3.5rem' }}>
           <button
             type="button"
-            aria-label="Fermer le menu"
+            aria-label={t('nav.close_menu')}
             className="absolute inset-0 bg-black/20"
             onClick={() => setMenuOpen(false)}
           />
@@ -232,7 +245,7 @@ export default function Navbar() {
             {adminNav.length > 0 && (
               <>
                 <div className="pt-2 mt-2 border-t border-stone-100">
-                  <span className="px-3 text-[10px] uppercase tracking-wider text-stone-400">Administration</span>
+                  <span className="px-3 text-[10px] uppercase tracking-wider text-stone-400">{t('nav.administration')}</span>
                 </div>
                 {adminNav.map(item => (
                   <button
@@ -250,19 +263,27 @@ export default function Navbar() {
               </>
             )}
             <div className="pt-3 mt-2 border-t border-stone-100">
+              <div className="flex justify-center mb-3">
+                <button
+                  onClick={toggleLang}
+                  className="text-xs font-medium text-stone-500 hover:text-emerald-700 bg-stone-100 hover:bg-emerald-50 px-3 py-1.5 rounded-md transition-colors"
+                >
+                  {i18n.language === 'fr' ? 'WO' : 'FR'}
+                </button>
+              </div>
               {!token ? (
                 <div className="flex gap-2">
                   <button
                     onClick={() => go('/login')}
                     className="flex-1 text-sm text-stone-600 py-2.5 rounded-lg hover:bg-stone-50 transition-colors"
                   >
-                    Connexion
+                    {t('nav.login')}
                   </button>
                   <button
                     onClick={() => go('/register')}
                     className="flex-1 text-sm text-emerald-700 bg-emerald-50 py-2.5 rounded-lg border border-emerald-200/60 transition-colors"
                   >
-                    S'inscrire
+                    {t('nav.register')}
                   </button>
                 </div>
               ) : (
@@ -272,7 +293,7 @@ export default function Navbar() {
                     onClick={logout}
                     className="text-xs text-stone-400 hover:text-stone-600 transition-colors"
                   >
-                    Déconnexion
+                    {t('nav.logout')}
                   </button>
                 </div>
               )}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 const ACTIVITY_COLORS = {
   production: '#4CAF50',
@@ -9,19 +10,21 @@ const ACTIVITY_COLORS = {
   autre: '#9E9E9E'
 };
 
-const LABELS = {
-  production: 'Production',
-  transformation: 'Transformation',
-  commercialisation: 'Commercialisation',
-  formation: 'Formation',
-  plaidoyer: 'Plaidoyer',
-  autre: 'Autre'
-};
-
 export default function Legend() {
+  const { t } = useTranslation();
+
+  const LABELS = {
+    production: t('activities.production'),
+    transformation: t('activities.transformation'),
+    commercialisation: t('activities.commercialisation'),
+    formation: t('activities.formation'),
+    plaidoyer: t('activities.plaidoyer'),
+    autre: t('activities.autre')
+  };
+
   return (
     <div className="bg-white shadow rounded-xl p-4 w-full">
-      <h4 className="text-sm font-semibold mb-2">Légende</h4>
+      <h4 className="text-sm font-semibold mb-2">{t('legend.title')}</h4>
       <ul className="space-y-2">
         {Object.entries(ACTIVITY_COLORS).map(([key, color]) => (
           <li key={key} className="flex items-center space-x-2 text-sm">

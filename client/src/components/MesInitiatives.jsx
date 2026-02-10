@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from 'react-i18next';
 import axios from "axios";
 
 export default function MesInitiatives() {
+  const { t } = useTranslation();
   const [initiatives, setInitiatives] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -23,7 +25,7 @@ export default function MesInitiatives() {
   }, []);
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Supprimer cette initiative ?")) return;
+    if (!window.confirm(t('my_initiatives.confirm_delete'))) return;
     try {
       const token = localStorage.getItem('token');
       await axios.delete(`${import.meta.env.VITE_API_URL}/data/${id}`, {
@@ -33,35 +35,35 @@ export default function MesInitiatives() {
     } catch (err) {
       console.error("Erreur suppression:", err);
       if (err.response?.status === 403) {
-        alert("Vous n'êtes pas autorisé à supprimer cette initiative.");
+        alert(t('my_initiatives.delete_forbidden'));
       } else {
-        alert("La suppression a échoué.");
+        alert(t('my_initiatives.delete_failed'));
       }
     }
   };
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Mes initiatives</h1>
+      <h1 className="text-2xl font-bold mb-4">{t('my_initiatives.title')}</h1>
 
       <button
         onClick={() => navigate(`/${slug}/submit`)}
         className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 mb-4"
       >
-        ➕ Nouvelle initiative
+        + {t('my_initiatives.new_initiative')}
       </button>
 
       {loading ? (
-        <p>Chargement...</p>
+        <p>{t('common.loading')}</p>
       ) : initiatives.length === 0 ? (
-        <p>Vous n'avez encore soumis aucune initiative.</p>
+        <p>{t('my_initiatives.no_initiatives')}</p>
       ) : (
         <ul className="space-y-4">
           {initiatives.map((item) => (
             <li key={item.id} className="border p-4 rounded shadow bg-white">
               <h2 className="text-xl font-semibold">{item.initiative}</h2>
               <p className="text-gray-600">
-                {item.commune || "Localisation inconnue"} —{" "}
+                {item.commune || t('my_initiatives.unknown_location')} —{" "}
                 {new Date(item.created_at).toLocaleDateString()}
               </p>
               <p className="text-sm text-gray-700 mt-2">{item.description}</p>
@@ -70,13 +72,13 @@ export default function MesInitiatives() {
                   className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-sm"
                   onClick={() => navigate(`/${slug}/edit/${item.id}`)}
                 >
-                  Modifier
+                  {t('common.edit')}
                 </button>
                 <button
                   className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
                   onClick={() => handleDelete(item.id)}
                 >
-                  Supprimer
+                  {t('common.delete')}
                 </button>
               </div>
             </li>
