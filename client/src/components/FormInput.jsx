@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, LayersControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-fullscreen';
 import 'leaflet-fullscreen/dist/leaflet.fullscreen.css';
 import { GeoSearchControl, OpenStreetMapProvider } from 'leaflet-geosearch';
 import 'leaflet-geosearch/dist/geosearch.css';
+import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { useDytael } from '../context/DytaelContext';
 
 const MAX_PHOTOS = 5;
@@ -56,8 +58,15 @@ const inputClasses = 'w-full border border-gray-200 rounded-lg bg-gray-100 px-4 
 const disabledInputClasses = 'w-full border border-gray-200 rounded-lg bg-gray-100 px-4 py-2.5 text-sm text-gray-500 cursor-not-allowed';
 
 export default function FormInput({ variant = 'default' }) {
+  const { t } = useTranslation();
   const isMobile = variant === 'mobile';
   const { currentDytael } = useDytael();
+  const { slug } = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const parentIdFromUrl = searchParams.get('parent_id');
+  const [parentName, setParentName] = useState('');
+  const [entryType, setEntryType] = useState(parentIdFromUrl ? 'initiative' : ''); // '', 'initiative', 'programme'
   const [customFields, setCustomFields] = useState([]);
   const [customValues, setCustomValues] = useState({});
   const [formData, setFormData] = useState({
@@ -71,6 +80,7 @@ export default function FormInput({ variant = 'default' }) {
     activities: [],
     lat: '',
     lon: '',
+    location_type: 'point',
     website: '',
     photos: [],
     contact_email: '',
@@ -78,7 +88,16 @@ export default function FormInput({ variant = 'default' }) {
     person_name: '',
     videos: [],
     social_media: [],
+    bailleurs: '',
+    organisation: '',
+    point_contact: '',
+    duree: '',
   });
+
+  const [locations, setLocations] = useState([
+    { label: '', lat: '', lon: '', village: '', commune: '', is_primary: false }
+  ]);
+  const [editingLocIndex, setEditingLocIndex] = useState(null); // null = modal closed
 
   const [videoLinks, setVideoLinks] = useState(['']);
   const [sameAsDeclarant, setSameAsDeclarant] = useState(false);
@@ -96,6 +115,14 @@ export default function FormInput({ variant = 'default' }) {
       .catch(() => setCustomFields([]));
   }, [currentDytael]);
 
+  // Load parent programme name when parent_id is in URL
+  useEffect(() => {
+    if (!parentIdFromUrl) return;
+    axios.get(`${import.meta.env.VITE_API_URL}/data/${parentIdFromUrl}`)
+      .then(res => setParentName(res.data?.initiative || ''))
+      .catch(() => setParentName(''));
+  }, [parentIdFromUrl]);
+
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
     if (type === 'file') {
@@ -104,11 +131,11 @@ export default function FormInput({ variant = 'default' }) {
       const filtered = limited.filter(f => f.size <= MAX_PHOTO_SIZE);
       let notice = '';
       if (picked.length > MAX_PHOTOS) {
-        notice = `Maximum ${MAX_PHOTOS} photos – seules les premières ont été conservées.`;
+        notice = t('form.photo_limit', { max: MAX_PHOTOS });
       }
       const rejected = limited.length - filtered.length;
       if (rejected > 0) {
-        notice = `${notice ? `${notice} ` : ''}${rejected} photo(s) dépassent 5 Mo et ont été ignorées.`;
+        notice = `${notice ? `${notice} ` : ''}${t('form.photo_oversize', { count: rejected })}`;
       }
       setPhotoNotice(notice);
       setFormData({ ...formData, photos: filtered });
@@ -165,13 +192,41 @@ export default function FormInput({ variant = 'default' }) {
   };
 
   const handleLocationPick = ({ lat, lon }, accuracy = null) => {
-    setFormData(prev => ({ ...prev, lat, lon }));
+    if (formData.location_type === 'multi' && editingLocIndex !== null) {
+      // Update the location being edited in the modal
+      setLocations(prev => prev.map((loc, idx) =>
+        idx === editingLocIndex ? { ...loc, lat, lon } : loc
+      ));
+    } else {
+      setFormData(prev => ({ ...prev, lat, lon }));
+    }
     setGpsAccuracy(typeof accuracy === 'number' ? accuracy : null);
+  };
+
+  const handleLocFieldChange = (index, field, value) => {
+    setLocations(prev => prev.map((loc, idx) =>
+      idx === index ? { ...loc, [field]: value } : loc
+    ));
+  };
+
+  const addLocation = () => {
+    if (locations.length < 10) {
+      const newIdx = locations.length;
+      setLocations(prev => [...prev, { label: '', lat: '', lon: '', village: '', commune: '', is_primary: false }]);
+      setEditingLocIndex(newIdx); // Open modal immediately for the new location
+    }
+  };
+
+  const removeLocation = (index) => {
+    if (locations.length <= 1) return;
+    const updated = locations.filter((_, idx) => idx !== index);
+    setLocations(updated);
+    setEditingLocIndex(null);
   };
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
-      alert("La géolocalisation n'est pas supportée par votre navigateur.");
+      alert(t('form.geolocation_unsupported'));
       return;
     }
 
@@ -187,7 +242,7 @@ export default function FormInput({ variant = 'default' }) {
         );
       },
       (error) => {
-        alert("Impossible d'obtenir la position actuelle.");
+        alert(t('form.geolocation_error'));
       }
     );
   };
@@ -196,6 +251,20 @@ export default function FormInput({ variant = 'default' }) {
     e.preventDefault();
 
   const data = new FormData();
+
+  // For multi mode, sync primary location to flat fields
+  let effectiveLat = formData.lat;
+  let effectiveLon = formData.lon;
+  let effectiveVillage = formData.village;
+  let effectiveCommune = formData.commune;
+
+  if (formData.location_type === 'multi' && locations.length > 0) {
+    const primary = locations.find(l => l.is_primary) || locations[0];
+    effectiveLat = primary.lat;
+    effectiveLon = primary.lon;
+    effectiveVillage = primary.village || formData.village;
+    effectiveCommune = primary.commune || formData.commune;
+  }
 
   for (const key in formData) {
     if (key === 'photos') {
@@ -206,29 +275,79 @@ export default function FormInput({ variant = 'default' }) {
       formData.videos.forEach((video) => data.append('videos', video));
     } else if (key === 'social_media') {
       data.append('social_media', JSON.stringify(formData.social_media));
+    } else if (key === 'lat') {
+      data.append('lat', effectiveLat);
+    } else if (key === 'lon') {
+      data.append('lon', effectiveLon);
+    } else if (key === 'village') {
+      data.append('village', effectiveVillage);
+    } else if (key === 'commune') {
+      data.append('commune', effectiveCommune);
     } else {
       data.append(key, formData[key]);
     }
   }
 
+  // Send locations array
+  if (formData.location_type === 'multi') {
+    data.append('locations', JSON.stringify(locations));
+  } else if (formData.location_type === 'point') {
+    // Create a single location entry for point mode
+    data.append('locations', JSON.stringify([{
+      label: 'Localisation principale',
+      lat: effectiveLat,
+      lon: effectiveLon,
+      village: effectiveVillage,
+      commune: effectiveCommune,
+      is_primary: true
+    }]));
+  }
+  // zone mode: no locations array needed
+
   data.append('geom', JSON.stringify({
     type: 'Point',
-    coordinates: [parseFloat(formData.lon), parseFloat(formData.lat)],
+    coordinates: [parseFloat(effectiveLon), parseFloat(effectiveLat)],
   }));
 
   data.append('extra_fields', JSON.stringify(customValues));
 
+  // Attach parent_id if creating a sub-initiative
+  if (parentIdFromUrl) {
+    data.append('parent_id', parentIdFromUrl);
+  }
+
+  // Force location_type to 'zone' for programmes (no GPS)
+  if (entryType === 'programme') {
+    data.set('location_type', 'zone');
+  }
+
   try {
     const token = localStorage.getItem('token');
-    if (!token) throw new Error("Token manquant. Vous devez être connecté.");
+    if (!token) throw new Error(t('form.token_missing'));
 
-    await axios.post(`${import.meta.env.VITE_API_URL}/data`, data, {
+    const response = await axios.post(`${import.meta.env.VITE_API_URL}/data`, data, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
 
-    alert('Initiative enregistrée (en attente de validation).');
+    const createdId = response.data?.id;
+
+    // If creating a programme, redirect to programme view
+    if (entryType === 'programme' && createdId) {
+      alert(t('form.programme_saved'));
+      navigate(`/${slug}/programme/${createdId}`);
+      return;
+    }
+
+    // If creating a sub-initiative, redirect back to parent programme
+    if (parentIdFromUrl) {
+      alert(t('form.sub_initiative_saved'));
+      navigate(`/${slug}/programme/${parentIdFromUrl}`);
+      return;
+    }
+
+    alert(t('form.initiative_saved'));
     setFormData({
       initiative: '',
       description: '',
@@ -240,6 +359,7 @@ export default function FormInput({ variant = 'default' }) {
       activities: [],
       lat: '',
       lon: '',
+      location_type: 'point',
       website: '',
       photos: [],
       contact_email: '',
@@ -248,6 +368,8 @@ export default function FormInput({ variant = 'default' }) {
       videos: [],
       social_media: [],
     });
+    setLocations([{ label: '', lat: '', lon: '', village: '', commune: '', is_primary: true }]);
+    setEditingLocIndex(null);
     setVideoLinks(['']);
     setSocialMedia([]);
     setSocialLinks({});
@@ -257,7 +379,7 @@ export default function FormInput({ variant = 'default' }) {
     setPhotoNotice('');
   } catch (error) {
     console.error("Erreur lors de la soumission :", error);
-    alert('Erreur lors de l\'envoi');
+    alert(t('common.submit_error'));
   }
 
   };
@@ -274,35 +396,232 @@ export default function FormInput({ variant = 'default' }) {
     return 'bg-gray-50 text-gray-600 border-gray-200';
   };
 
+  const activityLabel = (activity) => {
+    const key = activity.toLowerCase();
+    return t(`activities.${key === 'commercialisation' ? 'commercialisation' : key}`, activity);
+  };
+
   return (
     <div className={isMobile ? 'bg-gray-50 min-h-screen py-6 px-3' : 'bg-gray-50 min-h-screen py-8 px-4'}>
       <form onSubmit={handleSubmit} className={isMobile ? 'mx-auto w-full max-w-2xl space-y-6' : 'max-w-2xl mx-auto space-y-6'}>
 
         {/* Header */}
         <div className="bg-white rounded-xl border border-gray-200 px-6 py-5">
-          <h2 className="text-lg font-bold text-gray-800">Nouvelle Initiative</h2>
-          <p className="text-xs text-gray-400 mt-1">Les champs marqués d'un <span className="text-red-400">*</span> sont obligatoires</p>
+          <h2 className="text-lg font-bold text-gray-800">
+            {parentIdFromUrl ? t('form.new_initiative_sub') : entryType === 'programme' ? t('form.new_programme') : t('form.new_initiative')}
+          </h2>
+          <p className="text-xs text-gray-400 mt-1">{t('common.required_fields_text', { defaultValue: "Les champs marqués d'un * sont obligatoires" }).split('*')[0]}<span className="text-red-400">*</span>{t('common.required_fields_text').split('*')[1]}</p>
         </div>
 
-        {/* Informations générales */}
+        {/* Parent banner when creating a sub-initiative */}
+        {parentIdFromUrl && parentName && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-6 py-4 flex items-center gap-3">
+            <svg className="w-5 h-5 text-emerald-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <div>
+              <div className="text-sm font-medium text-emerald-800">{t('form.parent_programme')}</div>
+              <div className="text-sm text-emerald-700 font-semibold">{parentName}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Entry type selector (initiative vs programme) - only shown when not a sub-initiative */}
+        {!parentIdFromUrl && !entryType && (
+          <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">{t('form.what_to_register')}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setEntryType('initiative')}
+                className="text-left px-5 py-4 rounded-xl border-2 border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+              >
+                <div className="text-sm font-semibold text-gray-800">{t('form.an_initiative')}</div>
+                <div className="text-xs text-gray-500 mt-1">{t('form.initiative_desc')}</div>
+                <div className="text-xs text-gray-400 mt-1.5 italic">{t('form.initiative_example')}</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setEntryType('programme')}
+                className="text-left px-5 py-4 rounded-xl border-2 border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+              >
+                <div className="text-sm font-semibold text-gray-800">{t('form.a_programme')}</div>
+                <div className="text-xs text-gray-500 mt-1">{t('form.programme_desc')}</div>
+                <div className="text-xs text-gray-400 mt-1.5 italic">{t('form.programme_example')}</div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Show selected entry type with change option */}
+        {!parentIdFromUrl && entryType && (
+          <div className={`rounded-xl border px-5 py-3 flex items-center justify-between ${
+            entryType === 'programme'
+              ? 'bg-purple-50 border-purple-200'
+              : 'bg-emerald-50 border-emerald-200'
+          }`}>
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                entryType === 'programme'
+                  ? 'bg-purple-100 text-purple-700'
+                  : 'bg-emerald-100 text-emerald-700'
+              }`}>
+                {entryType === 'programme' ? t('form.programme_label') : t('form.initiative_label')}
+              </span>
+              <span className="text-sm text-gray-600">
+                {entryType === 'programme'
+                  ? t('form.add_after_submit')
+                  : t('form.standalone_initiative')
+                }
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEntryType('')}
+              className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+            >
+              {t('common.change')}
+            </button>
+          </div>
+        )}
+
+        {/* ====== PROGRAMME FORM (simplified) ====== */}
+        {entryType === 'programme' && <>
         <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">Informations générales</h3>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">{t('form.programme_info')}</h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom de l'initiative <span className="text-red-400">*</span></label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.programme_name')} <span className="text-red-400">*</span></label>
               <input
                 name="initiative"
-                placeholder="Ex: Ferme agroécologique de Bignona"
+                placeholder={t('form.programme_name_placeholder')}
                 onChange={handleChange}
                 value={formData.initiative}
                 className={inputClasses}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Description <span className="text-red-400">*</span></label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.description')} <span className="text-red-400">*</span></label>
               <textarea
                 name="description"
-                placeholder="Décrivez l'initiative en quelques lignes (max 500 caractères)"
+                placeholder={t('form.programme_desc_placeholder')}
+                value={formData.description}
+                onChange={handleChange}
+                maxLength={500}
+                rows={4}
+                className={inputClasses}
+              />
+              <div className="text-right mt-1">
+                <span className={`text-xs ${formData.description.length > 450 ? 'text-amber-500' : 'text-gray-300'}`}>{formData.description.length}/500</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">{t('form.programme_details')}</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.organisation')}</label>
+              <input
+                name="organisation"
+                placeholder={t('form.organisation_placeholder')}
+                value={formData.organisation}
+                onChange={handleChange}
+                className={inputClasses}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.bailleurs')}</label>
+              <textarea
+                name="bailleurs"
+                placeholder={t('form.bailleurs_placeholder')}
+                value={formData.bailleurs}
+                onChange={handleChange}
+                rows={3}
+                className={inputClasses}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.point_contact')}</label>
+                <input
+                  name="point_contact"
+                  placeholder={t('form.point_contact_placeholder')}
+                  value={formData.point_contact}
+                  onChange={handleChange}
+                  className={inputClasses}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.duration')}</label>
+                <input
+                  name="duree"
+                  placeholder={t('form.duration_placeholder')}
+                  value={formData.duree}
+                  onChange={handleChange}
+                  className={inputClasses}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.year')}</label>
+              <input
+                name="year"
+                type="number"
+                placeholder={t('form.year_placeholder', { defaultValue: 'Ex: 2023' })}
+                value={formData.year}
+                onChange={handleChange}
+                className={inputClasses}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">{t('form.location')}</h3>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.commune')}</label>
+                <input name="commune" placeholder={t('form.commune_placeholder')} value={formData.commune} onChange={handleChange} className={inputClasses} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.zone_intervention')}</label>
+                <input name="zone_intervention" placeholder={t('form.zone_intervention_placeholder', { defaultValue: 'Ex: Région de Ziguinchor' })} value={formData.zone_intervention} onChange={handleChange} className={inputClasses} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-2 pb-8">
+          <button
+            type="submit"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold px-6 py-3.5 rounded-xl shadow-sm transition-colors text-sm"
+          >
+            {t('form.create_programme')}
+          </button>
+        </div>
+        </>}
+
+        {/* ====== INITIATIVE FORM (full) ====== */}
+        {(entryType === 'initiative' || parentIdFromUrl) && <>
+        <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">{t('form.general_info')}</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.initiative_name')} <span className="text-red-400">*</span></label>
+              <input
+                name="initiative"
+                placeholder={t('form.initiative_name_placeholder')}
+                onChange={handleChange}
+                value={formData.initiative}
+                className={inputClasses}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.description')} <span className="text-red-400">*</span></label>
+              <textarea
+                name="description"
+                placeholder={t('form.description_placeholder')}
                 value={formData.description}
                 onChange={handleChange}
                 maxLength={500}
@@ -318,33 +637,33 @@ export default function FormInput({ variant = 'default' }) {
 
         {/* Profil */}
         <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">Profil de l'initiative</h3>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">{t('form.profile')}</h3>
           <div className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Type d'acteur <span className="text-red-400">*</span></label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.actor_type')} <span className="text-red-400">*</span></label>
               <select
                 name="actor_type"
                 value={formData.actor_type}
                 onChange={handleChange}
                 className={inputClasses}
               >
-                <option value="">-- Sélectionner --</option>
-                <option value="groupement">Groupement</option>
-                <option value="gouvernement">Gouvernement</option>
-                <option value="ONG">ONG</option>
-                <option value="recherche">Recherche</option>
-                <option value="entreprise">Entreprise</option>
-                <option value="informel">Informel</option>
-                <option value="autre">Autre</option>
+                <option value="">{t('form.select_option')}</option>
+                <option value="groupement">{t('actors.groupement')}</option>
+                <option value="gouvernement">{t('actors.gouvernement')}</option>
+                <option value="ONG">{t('actors.ong')}</option>
+                <option value="recherche">{t('actors.recherche')}</option>
+                <option value="entreprise">{t('actors.entreprise')}</option>
+                <option value="informel">{t('actors.informel')}</option>
+                <option value="autre">{t('actors.autre')}</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Année de création <span className="text-red-400">*</span></label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.year')} <span className="text-red-400">*</span></label>
               <input
                 name="year"
                 type="number"
-                placeholder="Ex: 2018"
+                placeholder={t('form.year_placeholder')}
                 value={formData.year}
                 onChange={handleChange}
                 className={inputClasses}
@@ -352,7 +671,7 @@ export default function FormInput({ variant = 'default' }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">Activités</label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">{t('form.activities_label')}</label>
               <div className="flex flex-wrap gap-2">
                 {activityOptions.map((activity) => {
                   const checked = formData.activities.includes(activity);
@@ -376,7 +695,7 @@ export default function FormInput({ variant = 'default' }) {
                       {checked && (
                         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                       )}
-                      {activity}
+                      {activityLabel(activity)}
                     </label>
                   );
                 })}
@@ -387,95 +706,398 @@ export default function FormInput({ variant = 'default' }) {
 
         {/* Localisation */}
         <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">Localisation</h3>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">{t('form.location')}</h3>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Village <span className="text-red-400">*</span></label>
-                <input name="village" placeholder="Nom du village" value={formData.village} onChange={handleChange} className={inputClasses} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Commune</label>
-                <input name="commune" placeholder="Nom de la commune" value={formData.commune} onChange={handleChange} className={inputClasses} />
-              </div>
-            </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-medium text-gray-700">Coordonnées GPS</label>
+            {/* Location type selector */}
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'point', label: t('form.location_precise'), desc: t('form.location_precise_desc') },
+                { value: 'multi', label: t('form.location_multi'), desc: t('form.location_multi_desc') },
+                { value: 'zone', label: t('form.location_zone'), desc: t('form.location_zone_desc') },
+              ].map(opt => (
                 <button
+                  key={opt.value}
                   type="button"
-                  onClick={getCurrentLocation}
-                  className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:text-emerald-800 font-medium transition-colors"
+                  onClick={() => setFormData(prev => ({ ...prev, location_type: opt.value }))}
+                  className={`flex-1 min-w-[120px] px-4 py-3 rounded-lg border text-left transition-all ${
+                    formData.location_type === opt.value
+                      ? 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-100'
+                      : 'border-gray-200 bg-white hover:bg-gray-50'
+                  }`}
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
-                  Ma position
+                  <div className={`text-sm font-medium ${formData.location_type === opt.value ? 'text-emerald-700' : 'text-gray-700'}`}>{opt.label}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{opt.desc}</div>
                 </button>
-              </div>
-
-              <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-3 mb-4">
-                <p className="text-xs text-emerald-800 leading-relaxed">
-                  Saisissez les coordonnées manuellement, cliquez sur <strong>"Ma position"</strong>, ou cliquez directement sur la carte.
-                </p>
-              </div>
-
-              {gpsAccuracy !== null && (
-                <div className={`mb-4 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm ${
-                  accuracyWarning ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-green-200 bg-green-50 text-green-700'
-                }`}>
-                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                  <span>
-                    Précision : <strong>{Math.round(gpsAccuracy)} m</strong> {accuracyWarning ? '(> 20 m – moins précis)' : '(bonne)'}
-                  </span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Latitude</label>
-                  <input name="lat" placeholder="Ex: 12.65" value={formData.lat}
-                    onChange={e => handleLocationPick({ lat: e.target.value, lon: formData.lon }, null)}
-                    className={inputClasses} />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Longitude</label>
-                  <input name="lon" placeholder="Ex: -16.25" value={formData.lon}
-                    onChange={e => handleLocationPick({ lat: formData.lat, lon: e.target.value }, null)}
-                    className={inputClasses} />
-                </div>
-              </div>
-
-              <MapContainer center={[parseFloat(formData.lat) || 14.5, parseFloat(formData.lon) || -17.5]}
-                zoom={7} scrollWheelZoom={true} fullscreenControl={true}
-                className="rounded-lg border border-gray-200 shadow-sm h-64 sm:h-80 w-full"
-              >
-                <LayersControl position="topright">
-                  <LayersControl.BaseLayer checked name="Satellite">
-                    <TileLayer
-                      url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                      attribution="Tiles © Esri"
-                    />
-                  </LayersControl.BaseLayer>
-                  <LayersControl.BaseLayer name="OpenStreetMap">
-                    <TileLayer
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      attribution="© OpenStreetMap contributors"
-                    />
-                  </LayersControl.BaseLayer>
-                </LayersControl>
-                <SearchBox onPick={({ lat, lon }) => handleLocationPick({ lat, lon }, null)} />
-                <LocationPicker onPick={({ lat, lon }) => handleLocationPick({ lat, lon }, null)} />
-                {formData.lat && formData.lon && (
-                  <Marker position={[parseFloat(formData.lat), parseFloat(formData.lon)]} icon={markerIcon} />
-                )}
-              </MapContainer>
+              ))}
             </div>
 
+            {/* === MODE POINT (default) === */}
+            {formData.location_type === 'point' && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.village')} <span className="text-red-400">*</span></label>
+                    <input name="village" placeholder={t('form.village_placeholder')} value={formData.village} onChange={handleChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.commune')}</label>
+                    <input name="commune" placeholder={t('form.commune_placeholder')} value={formData.commune} onChange={handleChange} className={inputClasses} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-gray-700">{t('form.gps_coordinates')}</label>
+                    <button
+                      type="button"
+                      onClick={getCurrentLocation}
+                      className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:text-emerald-800 font-medium transition-colors"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+                      {t('form.my_position')}
+                    </button>
+                  </div>
+
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-3 mb-4">
+                    <p className="text-xs text-emerald-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('form.gps_help') }} />
+                  </div>
+
+                  {gpsAccuracy !== null && (
+                    <div className={`mb-4 flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm ${
+                      accuracyWarning ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-green-200 bg-green-50 text-green-700'
+                    }`}>
+                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                      <span dangerouslySetInnerHTML={{ __html: `${t('form.accuracy', { value: Math.round(gpsAccuracy) })} ${accuracyWarning ? t('form.accuracy_bad') : t('form.accuracy_good')}` }} />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">{t('form.latitude')}</label>
+                      <input name="lat" placeholder={t('form.latitude_placeholder')} value={formData.lat}
+                        onChange={e => handleLocationPick({ lat: e.target.value, lon: formData.lon }, null)}
+                        className={inputClasses} />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">{t('form.longitude')}</label>
+                      <input name="lon" placeholder={t('form.longitude_placeholder')} value={formData.lon}
+                        onChange={e => handleLocationPick({ lat: formData.lat, lon: e.target.value }, null)}
+                        className={inputClasses} />
+                    </div>
+                  </div>
+
+                  <MapContainer center={[parseFloat(formData.lat) || 14.5, parseFloat(formData.lon) || -17.5]}
+                    zoom={7} scrollWheelZoom={true} fullscreenControl={true}
+                    className="rounded-lg border border-gray-200 shadow-sm h-64 sm:h-80 w-full"
+                  >
+                    <LayersControl position="topright">
+                      <LayersControl.BaseLayer checked name="Satellite">
+                        <TileLayer
+                          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                          attribution="Tiles © Esri"
+                        />
+                      </LayersControl.BaseLayer>
+                      <LayersControl.BaseLayer name="OpenStreetMap">
+                        <TileLayer
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          attribution="© OpenStreetMap contributors"
+                        />
+                      </LayersControl.BaseLayer>
+                    </LayersControl>
+                    <SearchBox onPick={({ lat, lon }) => handleLocationPick({ lat, lon }, null)} />
+                    <LocationPicker onPick={({ lat, lon }) => handleLocationPick({ lat, lon }, null)} />
+                    {formData.lat && formData.lon && (
+                      <Marker position={[parseFloat(formData.lat), parseFloat(formData.lon)]} icon={markerIcon} />
+                    )}
+                  </MapContainer>
+                </div>
+              </>
+            )}
+
+            {/* === MODE MULTI === */}
+            {formData.location_type === 'multi' && (
+              <>
+                {/* Summary list of locations */}
+                <div className="space-y-2">
+                  {locations.map((loc, idx) => {
+                    const hasCoords = loc.lat && loc.lon;
+                    return (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-3 border border-gray-200 rounded-lg px-4 py-3 bg-white"
+                      >
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${hasCoords ? 'bg-emerald-400' : 'bg-gray-300'}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-800 truncate">
+                            {loc.label || t('form.location_n', { n: idx + 1 })}
+                            {loc.is_primary && (
+                              <span className="ml-1.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{t('form.primary_location').toLowerCase()}</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-400 truncate">
+                            {loc.commune || loc.village || t('form.no_address')}
+                            {hasCoords && <span className="ml-1.5 text-emerald-500">({parseFloat(loc.lat).toFixed(4)}, {parseFloat(loc.lon).toFixed(4)})</span>}
+                            {!hasCoords && <span className="ml-1.5 text-amber-500">{t('form.no_coordinates')}</span>}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingLocIndex(idx)}
+                          className="shrink-0 text-xs font-medium text-emerald-700 hover:text-emerald-800 px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
+                        >
+                          {t('common.edit')}
+                        </button>
+                        {locations.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeLocation(idx)}
+                            className="shrink-0 text-xs text-red-400 hover:text-red-600 px-1.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                          >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {locations.length < 10 && (
+                  <button
+                    type="button"
+                    onClick={addLocation}
+                    className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:text-emerald-800 font-medium transition-colors"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+                    {t('form.add_location')}
+                  </button>
+                )}
+
+                {/* Recap map showing all placed points */}
+                {locations.some(l => l.lat && l.lon) && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t('form.location_preview')}</label>
+                    <MapContainer center={[14.5, -17.5]}
+                      zoom={7} scrollWheelZoom={false}
+                      className="rounded-lg border border-gray-200 shadow-sm h-48 w-full"
+                    >
+                      <TileLayer
+                        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                        attribution="Tiles © Esri"
+                      />
+                      {locations.map((loc, idx) => {
+                        const lt = parseFloat(loc.lat);
+                        const ln = parseFloat(loc.lon);
+                        if (Number.isNaN(lt) || Number.isNaN(ln)) return null;
+                        return (
+                          <Marker key={idx} position={[lt, ln]} icon={markerIcon}>
+                            <Popup>
+                              <span className="text-sm font-medium">{loc.label || t('form.location_n', { n: idx + 1 })}</span>
+                              {loc.commune && <span className="text-xs text-gray-400 block">{loc.commune}</span>}
+                            </Popup>
+                          </Marker>
+                        );
+                      })}
+                    </MapContainer>
+                  </div>
+                )}
+
+                {/* === LOCATION EDIT MODAL === */}
+                {editingLocIndex !== null && locations[editingLocIndex] && (
+                  <div className="fixed inset-0 z-[1000]">
+                    <div className="absolute inset-0 bg-black/50" onClick={() => setEditingLocIndex(null)} />
+                    <div className="absolute inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh] overflow-hidden">
+                      {/* Modal header */}
+                      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                        <h4 className="text-sm font-bold text-gray-800">
+                          {locations[editingLocIndex].label || t('form.location_n', { n: editingLocIndex + 1 })}
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => setEditingLocIndex(null)}
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors"
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                        </button>
+                      </div>
+
+                      {/* Modal body */}
+                      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1">{t('form.location_name')}</label>
+                          <input
+                            placeholder={t('form.location_name_placeholder')}
+                            value={locations[editingLocIndex].label}
+                            onChange={e => handleLocFieldChange(editingLocIndex, 'label', e.target.value)}
+                            className={inputClasses}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1">{t('form.village')}</label>
+                            <input
+                              placeholder={t('form.village_placeholder')}
+                              value={locations[editingLocIndex].village}
+                              onChange={e => handleLocFieldChange(editingLocIndex, 'village', e.target.value)}
+                              className={inputClasses}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-1">{t('form.commune')}</label>
+                            <input
+                              placeholder={t('form.commune_placeholder')}
+                              value={locations[editingLocIndex].commune}
+                              onChange={e => handleLocFieldChange(editingLocIndex, 'commune', e.target.value)}
+                              className={inputClasses}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Lieu principal checkbox */}
+                        <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
+                          <div className={`w-4.5 h-4.5 rounded border-2 flex items-center justify-center transition-colors ${locations[editingLocIndex].is_primary ? 'bg-emerald-600 border-emerald-600' : 'border-gray-300 bg-white'}`}>
+                            {locations[editingLocIndex].is_primary && <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={!!locations[editingLocIndex].is_primary}
+                            onChange={e => {
+                              const checked = e.target.checked;
+                              setLocations(prev => prev.map((loc, idx) => ({
+                                ...loc,
+                                is_primary: idx === editingLocIndex ? checked : (checked ? false : loc.is_primary)
+                              })));
+                            }}
+                            className="sr-only"
+                          />
+                          <span className="text-sm text-gray-600">{t('form.primary_location')}</span>
+                        </label>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs text-gray-400">{t('form.gps_coordinates')}</label>
+                            <button
+                              type="button"
+                              onClick={getCurrentLocation}
+                              className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-800 font-medium"
+                            >
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+                              {t('form.my_position')}
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
+                              <label className="block text-xs text-gray-400 mb-1">{t('form.latitude')}</label>
+                              <input
+                                placeholder={t('form.latitude_placeholder')}
+                                value={locations[editingLocIndex].lat}
+                                onChange={e => handleLocFieldChange(editingLocIndex, 'lat', e.target.value)}
+                                className={inputClasses}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-400 mb-1">{t('form.longitude')}</label>
+                              <input
+                                placeholder={t('form.longitude_placeholder')}
+                                value={locations[editingLocIndex].lon}
+                                onChange={e => handleLocFieldChange(editingLocIndex, 'lon', e.target.value)}
+                                className={inputClasses}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 mb-3">
+                            <p className="text-xs text-emerald-800">{t('form.gps_modal_help')}</p>
+                          </div>
+
+                          <MapContainer
+                            center={[
+                              parseFloat(locations[editingLocIndex].lat) || 14.5,
+                              parseFloat(locations[editingLocIndex].lon) || -17.5
+                            ]}
+                            zoom={7} scrollWheelZoom={true}
+                            className="rounded-lg border border-gray-200 shadow-sm h-56 w-full"
+                          >
+                            <LayersControl position="topright">
+                              <LayersControl.BaseLayer checked name="Satellite">
+                                <TileLayer
+                                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                  attribution="Tiles © Esri"
+                                />
+                              </LayersControl.BaseLayer>
+                              <LayersControl.BaseLayer name="OpenStreetMap">
+                                <TileLayer
+                                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                  attribution="© OpenStreetMap contributors"
+                                />
+                              </LayersControl.BaseLayer>
+                            </LayersControl>
+                            <SearchBox onPick={({ lat, lon }) => handleLocationPick({ lat, lon }, null)} />
+                            <LocationPicker onPick={({ lat, lon }) => handleLocationPick({ lat, lon }, null)} />
+                            {(() => {
+                              const lt = parseFloat(locations[editingLocIndex].lat);
+                              const ln = parseFloat(locations[editingLocIndex].lon);
+                              if (Number.isNaN(lt) || Number.isNaN(ln)) return null;
+                              return <Marker position={[lt, ln]} icon={markerIcon} />;
+                            })()}
+                          </MapContainer>
+                        </div>
+                      </div>
+
+                      {/* Modal footer */}
+                      <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                        {locations.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeLocation(editingLocIndex)}
+                            className="text-sm text-red-500 hover:text-red-700 font-medium transition-colors"
+                          >
+                            {t('form.delete_location')}
+                          </button>
+                        )}
+                        <div className="ml-auto">
+                          <button
+                            type="button"
+                            onClick={() => setEditingLocIndex(null)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                          >
+                            {t('common.validate')}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* === MODE ZONE === */}
+            {formData.location_type === 'zone' && (
+              <>
+                <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+                  <p className="text-xs text-blue-800 leading-relaxed">
+                    {t('form.zone_info')}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.village')}</label>
+                    <input name="village" placeholder={t('form.village_placeholder')} value={formData.village} onChange={handleChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.commune')} <span className="text-red-400">*</span></label>
+                    <input name="commune" placeholder={t('form.commune_placeholder')} value={formData.commune} onChange={handleChange} className={inputClasses} />
+                  </div>
+                </div>
+              </>
+            )}
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Zone d'intervention</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.zone_intervention')}</label>
               <input
                 name="zone_intervention"
-                placeholder="Si différente du lieu (ex: région de Ziguinchor)"
+                placeholder={t('form.zone_intervention_placeholder')}
                 value={formData.zone_intervention}
                 onChange={handleChange}
                 className={inputClasses}
@@ -486,7 +1108,7 @@ export default function FormInput({ variant = 'default' }) {
 
         {/* Contact */}
         <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">Contact</h3>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">{t('form.contact')}</h3>
 
           <label className="inline-flex items-center gap-2.5 mb-5 cursor-pointer select-none">
             <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${sameAsDeclarant ? 'bg-emerald-600 border-emerald-600' : 'border-gray-300 bg-white'}`}>
@@ -510,15 +1132,15 @@ export default function FormInput({ variant = 'default' }) {
               }}
               className="sr-only"
             />
-            <span className="text-sm text-gray-600">Même contact que le déclarant</span>
+            <span className="text-sm text-gray-600">{t('form.same_as_declarant')}</span>
           </label>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom du contact <span className="text-red-400">*</span></label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.contact_name')} <span className="text-red-400">*</span></label>
               <input
                 name="person_name"
-                placeholder="Prénom et nom"
+                placeholder={t('form.contact_name_placeholder')}
                 value={formData.person_name}
                 onChange={handleChange}
                 disabled={sameAsDeclarant}
@@ -527,7 +1149,7 @@ export default function FormInput({ variant = 'default' }) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Téléphone <span className="text-red-400">*</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.phone')} <span className="text-red-400">*</span></label>
                 <input
                   name="contact_phone"
                   placeholder="+221 XX XXX XX XX"
@@ -538,10 +1160,10 @@ export default function FormInput({ variant = 'default' }) {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.email_label')}</label>
                 <input
                   name="contact_email"
-                  placeholder="email@exemple.com"
+                  placeholder={t('form.email_placeholder')}
                   value={formData.contact_email}
                   onChange={handleChange}
                   disabled={sameAsDeclarant}
@@ -550,13 +1172,13 @@ export default function FormInput({ variant = 'default' }) {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Site internet</label>
-              <input name="website" placeholder="https://..." value={formData.website} onChange={handleChange} className={inputClasses} />
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.website')}</label>
+              <input name="website" placeholder={t('form.website_placeholder')} value={formData.website} onChange={handleChange} className={inputClasses} />
             </div>
 
             {currentDytael && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">DyTAEL</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('form.dytael')}</label>
                 <input
                   type="text"
                   value={currentDytael.name}
@@ -567,7 +1189,7 @@ export default function FormInput({ variant = 'default' }) {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">Réseaux sociaux</label>
+              <label className="block text-sm font-medium text-gray-700 mb-3">{t('form.social_media')}</label>
               <div className="flex flex-wrap gap-2 mb-4">
                 {['Facebook', 'Instagram', 'WhatsApp', 'YouTube', 'TikTok', 'LinkedIn', 'Autre'].map((platform) => {
                   const active = socialMedia.includes(platform);
@@ -594,7 +1216,7 @@ export default function FormInput({ variant = 'default' }) {
                       <label className="block text-xs text-gray-400 mb-1">{platform}</label>
                       <input
                         type="url"
-                        placeholder={`Lien vers ${platform}`}
+                        placeholder={t('form.social_link_placeholder', { platform })}
                         value={socialLinks[platform] || ''}
                         onChange={(e) => handleSocialLinkChange(platform, e.target.value)}
                         className={inputClasses}
@@ -610,8 +1232,8 @@ export default function FormInput({ variant = 'default' }) {
         {/* Champs additionnels */}
         {customFields.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Champs additionnels</h3>
-            <p className="text-xs text-gray-400 mb-5">Définis par l'administrateur du DyTAEL.</p>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('form.additional_fields')}</h3>
+            <p className="text-xs text-gray-400 mb-5">{t('form.additional_fields_desc')}</p>
             <div className="space-y-4">
               {customFields.map((f) => (
                 <div key={`${f.dytael || 'global'}-${f.field_key || f.key}`}>
@@ -644,9 +1266,9 @@ export default function FormInput({ variant = 'default' }) {
 
         {/* Photos */}
         <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">Photos</h3>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">{t('form.photos')}</h3>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Ajouter jusqu'à 5 photos</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('form.add_photos')}</label>
             <div className="relative">
               <input
                 type="file"
@@ -657,7 +1279,7 @@ export default function FormInput({ variant = 'default' }) {
                 className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 file:cursor-pointer file:transition-colors"
               />
             </div>
-            <p className="text-xs text-gray-400 mt-2">Formats acceptés : JPG, PNG. Max 5 Mo par photo.</p>
+            <p className="text-xs text-gray-400 mt-2">{t('form.photo_formats')}</p>
             {photoNotice && (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-700 flex items-center gap-2">
                 <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -667,13 +1289,13 @@ export default function FormInput({ variant = 'default' }) {
           </div>
         </div>
 
-        {/* Vidéos */}
+        {/* Videos */}
         <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">Liens vidéos</h3>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">{t('form.video_links')}</h3>
           <div className="space-y-3">
             {videoLinks.map((link, index) => (
               <div key={index}>
-                <label className="block text-xs text-gray-400 mb-1">Vidéo {index + 1}</label>
+                <label className="block text-xs text-gray-400 mb-1">{t('form.video_n', { n: index + 1 })}</label>
                 <input
                   type="url"
                   value={link}
@@ -690,7 +1312,7 @@ export default function FormInput({ variant = 'default' }) {
                 className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:text-emerald-800 font-medium transition-colors"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
-                Ajouter un lien vidéo
+                {t('form.add_video')}
               </button>
             )}
           </div>
@@ -702,9 +1324,10 @@ export default function FormInput({ variant = 'default' }) {
             type="submit"
             className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold px-6 py-3.5 rounded-xl shadow-sm transition-colors text-sm"
           >
-            Soumettre l'initiative
+            {parentIdFromUrl ? t('form.add_to_programme') : t('form.submit_initiative')}
           </button>
         </div>
+        </>}
       </form>
     </div>
   );

@@ -21,6 +21,7 @@ import TableView from './components/TableView';
 import DytaelLayout from './components/DytaelLayout';
 import DytaelChooser from './components/DytaelChooser';
 import DytaelManager from './components/DytaelManager';
+import ProgrammeView from './components/ProgrammeView';
 import DytaesRoute from './components/DytaesRoute';
 
 function App() {
@@ -97,6 +98,7 @@ function App() {
               <MesInitiatives />
             </ProtectedRoute>
           } />
+          <Route path="programme/:id" element={<ProgrammeView />} />
           <Route path="edit/:id" element={
             <ProtectedRoute>
               <EditInitiative />
