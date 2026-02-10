@@ -175,10 +175,10 @@ export default function CartoModule() {
       </div>
 
       <div className="order-2 md:order-1 hidden md:flex w-full md:w-96 border-r bg-white flex-col">
-        <div className="p-4 border-b">
+        <div className="px-4 pt-4 pb-3">
           <SearchBar value={search} onChange={setSearch} suggestions={filtered.slice(0, 5)} onSelect={onSelect} />
         </div>
-        <div className="p-4 border-b">
+        <div className="px-4 pb-4 border-b border-gray-100">
           <Filters
             filters={filters}
             setFilters={setFilters}
@@ -186,6 +186,9 @@ export default function CartoModule() {
             actors={uniqueActors}
             communes={uniqueCommunes}
           />
+        </div>
+        <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
+          <span className="text-xs text-gray-500 font-medium">{filtered.length} initiative{filtered.length !== 1 ? 's' : ''}</span>
         </div>
         <div className="flex-1 overflow-y-auto">
           <ListView items={filtered} onSelect={onSelect} selectedId={selectedId} />

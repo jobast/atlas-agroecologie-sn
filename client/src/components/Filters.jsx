@@ -32,10 +32,15 @@ export default function Filters({ filters, setFilters, activities = [], actors =
     return clean.charAt(0).toUpperCase() + clean.slice(1);
   };
 
+  const hasActiveFilters = filters.actor || filters.activities.length > 0 || filters.commune;
+
   return (
-    <div className="space-y-4 text-sm">
+    <div className="space-y-5 text-sm">
+      {/* Actor type pills */}
       <div>
-        <h4 className="font-semibold mb-2">Type d'acteur</h4>
+        <div className="flex items-center justify-between mb-2.5">
+          <h4 className="font-semibold text-gray-700 text-xs uppercase tracking-wide">Type d'acteur</h4>
+        </div>
         <div className="flex flex-wrap gap-2">
           {[...actors].sort((a, b) => {
             const la = a.toLowerCase();
@@ -50,7 +55,11 @@ export default function Filters({ filters, setFilters, activities = [], actors =
               key={a}
               type="button"
               onClick={() => setFilters({ ...filters, actor: filters.actor === a ? '' : a })}
-              className={`px-2 py-1 rounded border ${filters.actor === a ? 'bg-green-100 border-green-400 text-green-800' : 'border-gray-200'}`}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 ${
+                filters.actor === a
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
             >
               {formatActorLabel(a)}
             </button>
@@ -58,41 +67,57 @@ export default function Filters({ filters, setFilters, activities = [], actors =
         </div>
       </div>
 
+      {/* Activities dropdown + chips */}
       <div>
-        <h4 className="font-semibold mb-2">Activités</h4>
+        <h4 className="font-semibold text-gray-700 text-xs uppercase tracking-wide mb-2.5">Activités</h4>
         <select
           value=""
           onChange={(e) => { if (e.target.value) toggleActivity(e.target.value); }}
-          className="w-full border rounded px-2 py-1"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 focus:bg-white transition-colors"
         >
-          <option value="">Toutes les activités</option>
+          <option value="">Filtrer par activité...</option>
           {activities.map(a => <option key={a} value={a}>{formatActivityLabel(a)}</option>)}
         </select>
         {filters.activities.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2">
+          <div className="flex flex-wrap gap-1.5 mt-2.5">
             {filters.activities.map((a) => (
-              <span key={a} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs">
+              <span key={a} className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-200">
                 {formatActivityLabel(a)}
-                <button type="button" onClick={() => toggleActivity(a)} className="hover:text-green-950">&times;</button>
+                <button type="button" onClick={() => toggleActivity(a)} className="w-4 h-4 rounded-full hover:bg-emerald-200 inline-flex items-center justify-center transition-colors">
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
               </span>
             ))}
           </div>
         )}
       </div>
 
+      {/* Commune */}
       <div>
-        <h4 className="font-semibold mb-2">Commune</h4>
+        <h4 className="font-semibold text-gray-700 text-xs uppercase tracking-wide mb-2.5">Commune</h4>
         <input
           type="text"
           list="communes-list"
+          placeholder="Filtrer par commune..."
           value={filters.commune}
           onChange={(e) => setFilters({ ...filters, commune: e.target.value })}
-          className="w-full border rounded px-2 py-1"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 focus:bg-white transition-colors"
         />
         <datalist id="communes-list">
           {communes.map(c => <option key={c} value={c} />)}
         </datalist>
       </div>
+
+      {/* Clear all */}
+      {hasActiveFilters && (
+        <button
+          type="button"
+          onClick={() => setFilters({ activities: [], actor: '', commune: '' })}
+          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          Effacer tous les filtres
+        </button>
+      )}
     </div>
   );
 }
