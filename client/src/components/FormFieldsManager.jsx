@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
+const inputClasses = 'w-full border border-gray-200 rounded-lg bg-gray-100 px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 focus:bg-white transition-colors';
+
+const typeLabels = { text: 'Texte', number: 'Nombre', textarea: 'Zone de texte' };
+
 export default function FormFieldsManager() {
   const [fields, setFields] = useState([]);
   const [dytaels, setDytaels] = useState([]);
   const [draft, setDraft] = useState({ key: '', label: '', type: 'text', required: false, dytael_id: '' });
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('success');
   const token = localStorage.getItem('token');
 
   const load = async () => {
@@ -13,9 +18,14 @@ export default function FormFieldsManager() {
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/custom-fields`);
       setFields(res.data);
     } catch (err) {
-      setMessage("Erreur de chargement des champs.");
-      setTimeout(() => setMessage(''), 1500);
+      showMessage("Erreur de chargement des champs.", 'error');
     }
+  };
+
+  const showMessage = (msg, type = 'success') => {
+    setMessage(msg);
+    setMessageType(type);
+    setTimeout(() => setMessage(''), 3000);
   };
 
   useEffect(() => {
@@ -36,94 +46,137 @@ export default function FormFieldsManager() {
         dytael_id: draft.dytael_id || null
       }, { headers: { Authorization: `Bearer ${token}` } });
       setDraft({ key: '', label: '', type: 'text', required: false, dytael_id: '' });
-      setMessage('Champ ajouté.');
+      showMessage('Champ ajouté.');
       load();
     } catch (err) {
-      setMessage("Impossible d'ajouter le champ (admin requis).");
-      setTimeout(() => setMessage(''), 1500);
+      showMessage("Impossible d'ajouter le champ (admin requis).", 'error');
     }
   };
 
-  // Build a lookup for DyTAEL names
   const dytaelMap = {};
   dytaels.forEach(d => { dytaelMap[d.id] = d.name; });
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">Champs dynamiques du formulaire</h2>
-      <p className="text-sm text-gray-600 mb-4">
-        Champs persistés en base et utilisés par le formulaire de soumission.
-      </p>
-
-      <div className="grid md:grid-cols-4 gap-3 mb-4">
-        <input
-          type="text"
-          placeholder="Identifiant (ex: superficie)"
-          value={draft.key}
-          onChange={(e) => setDraft({ ...draft, key: e.target.value })}
-          className="border rounded px-3 py-2"
-        />
-        <input
-          type="text"
-          placeholder="Label (ex: Superficie cultivée)"
-          value={draft.label}
-          onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-          className="border rounded px-3 py-2"
-        />
-        <select
-          value={draft.type}
-          onChange={(e) => setDraft({ ...draft, type: e.target.value })}
-          className="border rounded px-3 py-2"
-        >
-          <option value="text">Texte</option>
-          <option value="number">Nombre</option>
-          <option value="textarea">Zone de texte</option>
-        </select>
-        <select
-          value={draft.dytael_id}
-          onChange={(e) => setDraft({ ...draft, dytael_id: e.target.value })}
-          className="border rounded px-3 py-2"
-        >
-          <option value="">Global (tous les DyTAELs)</option>
-          {dytaels.map(d => (
-            <option key={d.id} value={d.id}>{d.name}</option>
-          ))}
-        </select>
-      </div>
-      <label className="inline-flex items-center space-x-2 mb-4">
-        <input
-          type="checkbox"
-          checked={draft.required}
-          onChange={(e) => setDraft({ ...draft, required: e.target.checked })}
-        />
-        <span className="text-sm">Obligatoire ?</span>
-      </label>
-      <button
-        onClick={addField}
-        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-      >
-        Ajouter
-      </button>
-
-      <div className="mt-6 space-y-2">
-        {fields.length === 0 && <p className="text-gray-500">Aucun champ ajouté.</p>}
-        {fields.map((f) => (
-          <div key={`${f.dytael_id || 'global'}-${f.field_key || f.key}`} className="border rounded px-3 py-2 flex justify-between items-center">
-            <div>
-              <div className="font-semibold">{f.field_label || f.label}</div>
-              <div className="text-xs text-gray-500">
-                {(f.field_key || f.key)} · {f.field_type || f.type} · {f.dytael_id ? (dytaelMap[f.dytael_id] || `DyTAEL #${f.dytael_id}`) : 'Global'} {f.required ? '· obligatoire' : ''}
-              </div>
-            </div>
-          </div>
-        ))}
+    <div className="mx-4 md:mx-8 my-6 max-w-3xl space-y-6">
+      {/* Header */}
+      <div className="bg-white rounded-xl border border-gray-200 px-6 py-5">
+        <h1 className="text-lg font-bold text-gray-800">Champs du formulaire</h1>
+        <p className="text-xs text-gray-400 mt-0.5">Champs dynamiques ajoutés au formulaire de soumission</p>
       </div>
 
       {message && (
-        <div className="mt-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">
+        <div className={`rounded-xl border px-5 py-3 text-sm flex items-center gap-2 ${
+          messageType === 'error'
+            ? 'border-red-200 bg-red-50 text-red-700'
+            : 'border-green-200 bg-green-50 text-green-700'
+        }`}>
+          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
           {message}
         </div>
       )}
+
+      {/* Add field form */}
+      <div className="bg-white rounded-xl border border-gray-200 px-6 py-6">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-5">Nouveau champ</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Identifiant</label>
+            <input
+              type="text"
+              placeholder="Ex: superficie"
+              value={draft.key}
+              onChange={(e) => setDraft({ ...draft, key: e.target.value })}
+              className={inputClasses}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Label</label>
+            <input
+              type="text"
+              placeholder="Ex: Superficie cultivée"
+              value={draft.label}
+              onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+              className={inputClasses}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Type</label>
+            <select
+              value={draft.type}
+              onChange={(e) => setDraft({ ...draft, type: e.target.value })}
+              className={inputClasses}
+            >
+              <option value="text">Texte</option>
+              <option value="number">Nombre</option>
+              <option value="textarea">Zone de texte</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">DyTAEL</label>
+            <select
+              value={draft.dytael_id}
+              onChange={(e) => setDraft({ ...draft, dytael_id: e.target.value })}
+              className={inputClasses}
+            >
+              <option value="">Global (tous)</option>
+              {dytaels.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
+            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${draft.required ? 'bg-emerald-600 border-emerald-600' : 'border-gray-300 bg-white'}`}>
+              {draft.required && <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+            </div>
+            <input
+              type="checkbox"
+              checked={draft.required}
+              onChange={(e) => setDraft({ ...draft, required: e.target.checked })}
+              className="sr-only"
+            />
+            <span className="text-sm text-gray-600">Obligatoire</span>
+          </label>
+          <button
+            onClick={addField}
+            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+            Ajouter
+          </button>
+        </div>
+      </div>
+
+      {/* Existing fields */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Champs existants</span>
+          <span className="text-xs text-gray-400 ml-2">{fields.length}</span>
+        </div>
+        {fields.length === 0 ? (
+          <div className="px-6 py-12 text-center">
+            <svg className="w-10 h-10 mx-auto text-gray-300 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+            <p className="text-gray-400">Aucun champ ajouté.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {fields.map((f) => (
+              <div key={`${f.dytael_id || 'global'}-${f.field_key || f.key}`} className="px-6 py-4 flex items-center justify-between hover:bg-emerald-50/30 transition-colors">
+                <div>
+                  <div className="font-semibold text-gray-800">{f.field_label || f.label}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{f.field_key || f.key}</span>
+                    <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{typeLabels[f.field_type || f.type] || f.field_type || f.type}</span>
+                    <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{f.dytael_id ? (dytaelMap[f.dytael_id] || `DyTAEL #${f.dytael_id}`) : 'Global'}</span>
+                    {f.required && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">Obligatoire</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
