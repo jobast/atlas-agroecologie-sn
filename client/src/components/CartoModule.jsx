@@ -190,6 +190,19 @@ export default function CartoModule() {
     return Array.from(set);
   }, [raw]);
 
+  const handleSidebarFilter = useCallback((type, value) => {
+    if (type === 'actor') {
+      setFilters(f => ({ ...f, actor: value }));
+    } else if (type === 'activity') {
+      setFilters(f => ({
+        ...f,
+        activities: f.activities.includes(value)
+          ? f.activities.filter(a => a !== value)
+          : [...f.activities, value]
+      }));
+    }
+  }, []);
+
   const stats = useMemo(() => {
     const total = filtered.length;
     const actors = {};
@@ -224,7 +237,7 @@ export default function CartoModule() {
         {error && <div className="absolute inset-0 flex items-center justify-center text-red-600 bg-white/80">{error}</div>}
 
         <div className="hidden md:block">
-          <Sidebar stats={stats} variant="overlay" />
+          <Sidebar stats={stats} variant="overlay" filters={filters} onFilterChange={handleSidebarFilter} />
         </div>
 
         <button
@@ -319,7 +332,7 @@ export default function CartoModule() {
               )}
               {mobileTab === 'stats' && (
                 <div className="space-y-3">
-                  <Sidebar stats={stats} variant="embedded" />
+                  <Sidebar stats={stats} variant="embedded" filters={filters} onFilterChange={handleSidebarFilter} />
                 </div>
               )}
             </div>

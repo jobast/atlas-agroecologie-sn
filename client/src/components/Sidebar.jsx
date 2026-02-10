@@ -27,9 +27,10 @@ const activityBarColor = (value) => {
   return '#94a3b8';
 };
 
-export default function Sidebar({ stats, variant = 'overlay' }) {
+export default function Sidebar({ stats, variant = 'overlay', filters, onFilterChange }) {
   const { t } = useTranslation();
   const [hoveredActor, setHoveredActor] = useState(null);
+  const activeActor = filters?.actor || null;
   const [showActivityDetails, setShowActivityDetails] = useState(false);
 
   // Actors — sorted descending, NO grouping
@@ -77,25 +78,31 @@ export default function Sidebar({ stats, variant = 'overlay' }) {
             <div className="px-5 py-4 border-t border-gray-100">
               <h4 className="font-semibold text-gray-700 text-xs uppercase tracking-wide mb-4">{t('sidebar.actor_types')}</h4>
               <div className="flex justify-center mb-4">
-                <svg viewBox="0 0 42 42" className="w-36 h-36">
+                <svg viewBox="-1 -1 44 44" className="w-36 h-36">
                   <circle cx="21" cy="21" r="15.915" fill="none" stroke="#f3f4f6" strokeWidth="9" />
-                  {pieSegments.map((seg) => (
-                    <circle
-                      key={seg.key}
-                      cx="21"
-                      cy="21"
-                      r="15.915"
-                      fill="none"
-                      strokeWidth={hoveredActor === seg.key ? 11 : 9}
-                      stroke={seg.color}
-                      strokeDasharray={`${seg.pct} ${100 - seg.pct}`}
-                      strokeDashoffset={-seg.start}
-                      opacity={hoveredActor && hoveredActor !== seg.key ? 0.35 : 1}
-                      className="transition-all duration-200 cursor-pointer"
-                      onMouseEnter={() => setHoveredActor(seg.key)}
-                      onMouseLeave={() => setHoveredActor(null)}
-                    />
-                  ))}
+                  {pieSegments.map((seg) => {
+                    const isActive = activeActor === seg.key;
+                    const isHovered = hoveredActor === seg.key;
+                    const dimmed = (activeActor && !isActive) || (hoveredActor && !isHovered);
+                    return (
+                      <circle
+                        key={seg.key}
+                        cx="21"
+                        cy="21"
+                        r="15.915"
+                        fill="none"
+                        strokeWidth={isActive || isHovered ? 11 : 9}
+                        stroke={seg.color}
+                        strokeDasharray={`${seg.pct} ${100 - seg.pct}`}
+                        strokeDashoffset={-seg.start}
+                        opacity={dimmed ? 0.35 : 1}
+                        className="transition-all duration-200 cursor-pointer"
+                        onMouseEnter={() => setHoveredActor(seg.key)}
+                        onMouseLeave={() => setHoveredActor(null)}
+                        onClick={() => onFilterChange?.('actor', isActive ? '' : seg.key)}
+                      />
+                    );
+                  })}
                   {hoveredActor ? (
                     <>
                       <text x="21" y="19.5" textAnchor="middle" className="fill-gray-800 text-[4px] font-bold">
@@ -118,20 +125,27 @@ export default function Sidebar({ stats, variant = 'overlay' }) {
                 </svg>
               </div>
               <div className="flex flex-wrap gap-x-3 gap-y-1.5 justify-center">
-                {pieSegments.map((seg) => (
-                  <span
-                    key={seg.key}
-                    className={`inline-flex items-center gap-1.5 text-xs cursor-pointer rounded-full px-2 py-0.5 transition-all duration-150 ${hoveredActor === seg.key ? 'bg-gray-100 font-semibold' : 'text-gray-600'}`}
-                    onMouseEnter={() => setHoveredActor(seg.key)}
-                    onMouseLeave={() => setHoveredActor(null)}
-                  >
+                {pieSegments.map((seg) => {
+                  const isActive = activeActor === seg.key;
+                  const isHovered = hoveredActor === seg.key;
+                  const dimmed = activeActor && !isActive && !isHovered;
+                  return (
                     <span
-                      className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: seg.color }}
-                    />
-                    {seg.label} <span className="font-semibold tabular-nums">{seg.value}</span>
-                  </span>
-                ))}
+                      key={seg.key}
+                      className={`inline-flex items-center gap-1.5 text-xs cursor-pointer rounded-full px-2 py-0.5 transition-all duration-150 ${isActive ? 'bg-emerald-50 ring-1 ring-emerald-300 font-semibold' : isHovered ? 'bg-gray-100 font-semibold' : 'text-gray-600'}`}
+                      style={{ opacity: dimmed ? 0.45 : 1 }}
+                      onMouseEnter={() => setHoveredActor(seg.key)}
+                      onMouseLeave={() => setHoveredActor(null)}
+                      onClick={() => onFilterChange?.('actor', isActive ? '' : seg.key)}
+                    >
+                      <span
+                        className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: seg.color }}
+                      />
+                      {seg.label} <span className="font-semibold tabular-nums">{seg.value}</span>
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -141,23 +155,34 @@ export default function Sidebar({ stats, variant = 'overlay' }) {
             <div className="px-5 py-4 border-t border-gray-100">
               <h4 className="font-semibold text-gray-700 text-xs uppercase tracking-wide mb-3">{t('sidebar.activities')}</h4>
               <div className="space-y-2.5">
-                {activityMain.map(([k, v]) => (
-                  <div key={k}>
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="text-sm text-gray-700">{formatActorLabel(k)}</span>
-                      <span className="text-sm font-semibold tabular-nums text-gray-800">{v}</span>
+                {activityMain.map(([k, v]) => {
+                  const activeActivities = filters?.activities || [];
+                  const hasActiveFilter = activeActivities.length > 0;
+                  const isActive = activeActivities.some(f => f.toLowerCase() === k.toLowerCase());
+                  const dimmed = hasActiveFilter && !isActive;
+                  return (
+                    <div
+                      key={k}
+                      className="cursor-pointer rounded-lg px-1 -mx-1 transition-all duration-150 hover:bg-gray-50"
+                      style={{ opacity: dimmed ? 0.35 : 1 }}
+                      onClick={() => onFilterChange?.('activity', k)}
+                    >
+                      <div className="flex justify-between items-baseline mb-1">
+                        <span className="text-sm text-gray-700">{formatActorLabel(k)}</span>
+                        <span className="text-sm font-semibold tabular-nums text-gray-800">{v}</span>
+                      </div>
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{
+                            width: `${(v / activityMax) * 100}%`,
+                            backgroundColor: activityBarColor(k)
+                          }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-300"
-                        style={{
-                          width: `${(v / activityMax) * 100}%`,
-                          backgroundColor: activityBarColor(k)
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {activitySmall.length > 0 && (
                   <div>
                     <button
@@ -173,12 +198,23 @@ export default function Sidebar({ stats, variant = 'overlay' }) {
                     </button>
                     {showActivityDetails && (
                       <div className="ml-5 mt-2 space-y-1.5">
-                        {activitySmall.map(([k, v]) => (
-                          <div key={k} className="flex justify-between text-xs text-gray-400">
-                            <span>{formatActorLabel(k)}</span>
-                            <span className="font-medium text-gray-500 tabular-nums">{v}</span>
-                          </div>
-                        ))}
+                        {activitySmall.map(([k, v]) => {
+                          const activeActivities = filters?.activities || [];
+                          const hasActiveFilter = activeActivities.length > 0;
+                          const isActive = activeActivities.some(f => f.toLowerCase() === k.toLowerCase());
+                          const dimmed = hasActiveFilter && !isActive;
+                          return (
+                            <div
+                              key={k}
+                              className="flex justify-between text-xs text-gray-400 cursor-pointer hover:text-gray-600 transition-colors"
+                              style={{ opacity: dimmed ? 0.35 : 1 }}
+                              onClick={() => onFilterChange?.('activity', k)}
+                            >
+                              <span>{formatActorLabel(k)}</span>
+                              <span className="font-medium text-gray-500 tabular-nums">{v}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
