@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS initiatives (
   activities JSON,
   lat DOUBLE,
   lon DOUBLE,
+  location_type ENUM('point', 'multi', 'zone') DEFAULT 'point',
   contact_email VARCHAR(255),
   contact_phone VARCHAR(50),
   person_name VARCHAR(255),
@@ -54,8 +55,15 @@ CREATE TABLE IF NOT EXISTS initiatives (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   user_id INT,
   dytael_id INT NULL,
+  parent_id INT NULL,
+  bailleurs TEXT NULL,
+  organisation VARCHAR(255) NULL,
+  point_contact VARCHAR(255) NULL,
+  duree VARCHAR(100) NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-  FOREIGN KEY (dytael_id) REFERENCES dytaels(id) ON DELETE SET NULL
+  FOREIGN KEY (dytael_id) REFERENCES dytaels(id) ON DELETE SET NULL,
+  FOREIGN KEY (parent_id) REFERENCES initiatives(id) ON DELETE CASCADE,
+  INDEX idx_parent (parent_id)
 );
 
 -- Custom fields
@@ -68,6 +76,21 @@ CREATE TABLE IF NOT EXISTS custom_fields (
   dytael_id INT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (dytael_id) REFERENCES dytaels(id) ON DELETE SET NULL
+);
+
+-- Initiative locations (multi-localisation)
+CREATE TABLE IF NOT EXISTS initiative_locations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  initiative_id INT NOT NULL,
+  label VARCHAR(255),
+  lat DOUBLE,
+  lon DOUBLE,
+  village VARCHAR(100),
+  commune VARCHAR(100),
+  is_primary BOOLEAN DEFAULT FALSE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
+  INDEX idx_loc_initiative (initiative_id)
 );
 
 -- Photos

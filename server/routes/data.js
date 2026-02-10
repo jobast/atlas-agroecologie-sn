@@ -63,6 +63,69 @@ async function attachPhotos(rows, req) {
   return rows.map(r => ({ ...r, photos: grouped[r.id] || [] }));
 }
 
+async function attachChildren(rows) {
+  if (!rows || rows.length === 0) return rows;
+  const ids = rows.map(r => r.id);
+  const [childRows] = await pool.query(
+    'SELECT id, parent_id, initiative, commune, status FROM initiatives WHERE parent_id IN (?)',
+    [ids]
+  );
+  const grouped = {};
+  childRows.forEach(c => {
+    if (!grouped[c.parent_id]) grouped[c.parent_id] = [];
+    grouped[c.parent_id].push({
+      id: c.id,
+      initiative: c.initiative,
+      commune: c.commune,
+      status: c.status
+    });
+  });
+  return rows.map(r => ({
+    ...r,
+    children: grouped[r.id] || [],
+    is_programme: (grouped[r.id] || []).length > 0
+  }));
+}
+
+async function attachParent(rows) {
+  if (!rows || rows.length === 0) return rows;
+  const parentIds = [...new Set(rows.filter(r => r.parent_id).map(r => r.parent_id))];
+  if (parentIds.length === 0) return rows;
+  const [parentRows] = await pool.query(
+    'SELECT id, initiative FROM initiatives WHERE id IN (?)',
+    [parentIds]
+  );
+  const parentMap = {};
+  parentRows.forEach(p => { parentMap[p.id] = { id: p.id, initiative: p.initiative }; });
+  return rows.map(r => ({
+    ...r,
+    parent: r.parent_id ? (parentMap[r.parent_id] || null) : null
+  }));
+}
+
+async function attachLocations(rows) {
+  if (!rows || rows.length === 0) return rows;
+  const ids = rows.map(r => r.id);
+  const [locRows] = await pool.query(
+    'SELECT id, initiative_id, label, lat, lon, village, commune, is_primary FROM initiative_locations WHERE initiative_id IN (?) ORDER BY is_primary DESC, id ASC',
+    [ids]
+  );
+  const grouped = {};
+  locRows.forEach(l => {
+    if (!grouped[l.initiative_id]) grouped[l.initiative_id] = [];
+    grouped[l.initiative_id].push({
+      id: l.id,
+      label: l.label,
+      lat: l.lat,
+      lon: l.lon,
+      village: l.village,
+      commune: l.commune,
+      is_primary: !!l.is_primary
+    });
+  });
+  return rows.map(r => ({ ...r, locations: grouped[r.id] || [] }));
+}
+
 // ✅ POST /api/data – Créer une nouvelle initiative
 router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) => {
   console.log('POST /api/data — user:', req.user?.id, 'files:', req.files?.length || 0);
@@ -77,14 +140,32 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
     year,
     lat,
     lon,
+    location_type,
     contact_email,
     contact_phone,
     person_name,
     website,
     social_media,
     videos,
-    extra_fields
+    extra_fields,
+    parent_id,
+    bailleurs,
+    organisation,
+    point_contact,
+    duree
   } = req.body;
+
+  // Parse locations array from JSON string
+  let locations = [];
+  try {
+    if (req.body.locations) {
+      locations = typeof req.body.locations === 'string'
+        ? JSON.parse(req.body.locations)
+        : req.body.locations;
+    }
+  } catch (_) {
+    locations = [];
+  }
 
   let activities = req.body.activities;
   if (!Array.isArray(activities)) {
@@ -101,15 +182,34 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
       return [];
     };
 
+    // Validate parent_id if provided
+    let parentIdInt = null;
+    if (parent_id) {
+      parentIdInt = parseInt(parent_id);
+      if (Number.isNaN(parentIdInt)) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'parent_id invalide.' });
+      }
+      const [parentRows] = await conn.query(
+        'SELECT id, dytael_id FROM initiatives WHERE id = ?',
+        [parentIdInt]
+      );
+      if (parentRows.length === 0) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Programme parent introuvable.' });
+      }
+    }
+
     const insertSQL = `
       INSERT INTO initiatives (
         initiative, description, village, commune, zone_intervention,
-        actor_type, year, activities, lat, lon,
+        actor_type, year, activities, lat, lon, location_type,
         contact_email, contact_phone, person_name,
         website, social_media, videos, extra_fields,
-        created_at, user_id, dytael_id, status
+        created_at, user_id, dytael_id, parent_id,
+        bailleurs, organisation, point_contact, duree, status
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, 'pending')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, 'pending')
     `;
 
     // Normaliser les champs JSON/array
@@ -163,6 +263,10 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
       dytaelId = parseInt(req.body.dytael_id);
     }
 
+    // Determine effective location_type
+    const validTypes = ['point', 'multi', 'zone'];
+    const locType = validTypes.includes(location_type) ? location_type : 'point';
+
     const [result] = await conn.query(insertSQL, [
       initiative,
       description,
@@ -174,6 +278,7 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
       activitiesJson,
       Number.isNaN(latNum) ? null : latNum,
       Number.isNaN(lonNum) ? null : lonNum,
+      locType,
       contact_email,
       contact_phone,
       person_name,
@@ -182,11 +287,41 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
       videosJson,
       extraFieldsJson,
       userId,
-      dytaelId
+      dytaelId,
+      parentIdInt,
+      bailleurs || null,
+      organisation || null,
+      point_contact || null,
+      duree || null
     ]);
 
     const initiativeId = result.insertId;
     await sendNewSubmissionAlert(initiative);
+
+    // Insert locations
+    if (locations.length > 0) {
+      const insertLocSQL = `INSERT INTO initiative_locations (initiative_id, label, lat, lon, village, commune, is_primary) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+      for (let idx = 0; idx < locations.length; idx++) {
+        const loc = locations[idx];
+        const locLat = parseFloat(loc.lat);
+        const locLon = parseFloat(loc.lon);
+        await conn.query(insertLocSQL, [
+          initiativeId,
+          loc.label || null,
+          Number.isNaN(locLat) ? null : locLat,
+          Number.isNaN(locLon) ? null : locLon,
+          loc.village || null,
+          loc.commune || null,
+          !!loc.is_primary
+        ]);
+      }
+    } else if (!Number.isNaN(latNum) && !Number.isNaN(lonNum)) {
+      // Backward compat: no locations array but lat/lon present → create 1 location
+      await conn.query(
+        `INSERT INTO initiative_locations (initiative_id, label, lat, lon, village, commune, is_primary) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [initiativeId, 'Localisation principale', latNum, lonNum, village || null, commune || null, true]
+      );
+    }
 
     if (req.files && req.files.length) {
       const insertPhotoSQL = `INSERT INTO photos (initiative_id, filename) VALUES (?, ?)`;
@@ -196,7 +331,7 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
     }
 
     await conn.commit();
-    res.status(201).json({ message: 'Donnée enregistrée', id: initiativeId });
+    res.status(201).json({ message: 'Donnée enregistrée', id: initiativeId, parent_id: parentIdInt });
   } catch (err) {
     await conn.rollback();
     console.error('💥 Erreur lors de l’insertion :', err);
@@ -225,14 +360,21 @@ router.get('/', async (req, res) => {
     let query = `
       SELECT
         i.id, i.initiative, i.description, i.village, i.commune, i.zone_intervention,
-        i.actor_type, i.year, i.activities, i.lat, i.lon,
+        i.actor_type, i.year, i.activities, i.lat, i.lon, i.location_type,
         i.contact_email, i.contact_phone, i.person_name,
         i.website, i.social_media, i.videos, i.extra_fields, i.status,
-        i.created_at, i.user_id, i.dytael_id
+        i.created_at, i.user_id, i.dytael_id, i.parent_id,
+        i.bailleurs, i.organisation, i.point_contact, i.duree
       FROM initiatives i
     `;
     const conditions = [];
     const values = [];
+
+    // By default, public lists only show root initiatives (not sub-initiatives)
+    // Pass ?include_children=true to include sub-initiatives
+    if (status && !req.query.include_children) {
+      conditions.push('i.parent_id IS NULL');
+    }
 
     if (status) {
       conditions.push('i.status = ?');
@@ -264,7 +406,10 @@ router.get('/', async (req, res) => {
 
     const [rows] = await pool.query(query, values);
     const withPhotos = await attachPhotos(rows, req);
-    res.json(withPhotos);
+    const withLocations = await attachLocations(withPhotos);
+    const withChildren = await attachChildren(withLocations);
+    const withParent = await attachParent(withChildren);
+    res.json(withParent);
   } catch (err) {
     console.error('Erreur GET /api/data:', err);
     res.status(500).json({ error: 'Erreur serveur' });
@@ -374,17 +519,21 @@ router.get('/mine', authenticateToken, async (req, res) => {
     const [rows] = await pool.query(`
       SELECT
         id, initiative, description, village, commune, zone_intervention,
-        actor_type, year, activities, lat, lon,
+        actor_type, year, activities, lat, lon, location_type,
         contact_email, contact_phone, person_name,
         website, social_media, videos, extra_fields, status,
-        created_at, user_id
+        created_at, user_id, parent_id,
+        bailleurs, organisation, point_contact, duree
       FROM initiatives
       WHERE user_id = ?
       ORDER BY created_at DESC
     `, [req.user.id]);
 
     const withPhotos = await attachPhotos(rows, req);
-    res.json(withPhotos);
+    const withLocations = await attachLocations(withPhotos);
+    const withChildren = await attachChildren(withLocations);
+    const withParent = await attachParent(withChildren);
+    res.json(withParent);
   } catch (err) {
     console.error('Erreur GET /api/data/mine:', err);
     res.status(500).json({ error: 'Erreur serveur' });
@@ -409,6 +558,32 @@ router.post('/:id/request-delete', authenticateToken, async (req, res) => {
   }
 });
 
+// ✅ GET /api/data/:id/children – sous-initiatives d'un programme
+router.get('/:id/children', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        id, initiative, description, village, commune, zone_intervention,
+        actor_type, year, activities, lat, lon, location_type,
+        contact_email, contact_phone, person_name,
+        website, social_media, videos, extra_fields, status,
+        created_at, user_id, parent_id,
+        bailleurs, organisation, point_contact, duree
+      FROM initiatives
+      WHERE parent_id = ?
+      ORDER BY created_at DESC
+    `, [id]);
+
+    const withPhotos = await attachPhotos(rows, req);
+    const withLocations = await attachLocations(withPhotos);
+    res.json(withLocations);
+  } catch (err) {
+    console.error("Erreur GET /api/data/:id/children:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 // ✅ GET /api/data/:id – récupérer une initiative spécifique
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
@@ -416,10 +591,11 @@ router.get('/:id', async (req, res) => {
     const [rows] = await pool.query(`
       SELECT
         id, initiative, description, village, commune, zone_intervention,
-        actor_type, year, activities, lat, lon,
+        actor_type, year, activities, lat, lon, location_type,
         contact_email, contact_phone, person_name,
         website, social_media, videos, extra_fields, status,
-        created_at, user_id
+        created_at, user_id, parent_id,
+        bailleurs, organisation, point_contact, duree
       FROM initiatives
       WHERE id = ?
     `, [id]);
@@ -429,7 +605,10 @@ router.get('/:id', async (req, res) => {
     }
 
     const withPhotos = await attachPhotos(rows, req);
-    res.json(withPhotos[0]);
+    const withLocations = await attachLocations(withPhotos);
+    const withChildren = await attachChildren(withLocations);
+    const withParent = await attachParent(withChildren);
+    res.json(withParent[0]);
   } catch (err) {
     console.error("Erreur GET /api/data/:id:", err);
     res.status(500).json({ error: "Erreur serveur" });
@@ -450,41 +629,97 @@ router.put('/:id', authenticateToken, async (req, res) => {
     activities,
     lat,
     lon,
+    location_type,
     contact_email,
     contact_phone,
     person_name,
     website,
     social_media,
     videos,
-    extra_fields
+    extra_fields,
+    parent_id,
+    bailleurs,
+    organisation,
+    point_contact,
+    duree
   } = req.body;
 
-    const formattedActivities = Array.isArray(activities)
+  // Parse locations array
+  let locations = [];
+  try {
+    if (req.body.locations) {
+      locations = typeof req.body.locations === 'string'
+        ? JSON.parse(req.body.locations)
+        : req.body.locations;
+    }
+  } catch (_) {
+    locations = [];
+  }
+
+  const formattedActivities = Array.isArray(activities)
     ? JSON.stringify(activities)
     : JSON.stringify([activities]);
   const extraFieldsJson = extra_fields
     ? (typeof extra_fields === 'string' ? extra_fields : JSON.stringify(extra_fields))
     : null;
 
+  const validTypes = ['point', 'multi', 'zone'];
+  const locType = validTypes.includes(location_type) ? location_type : 'point';
+
+  // Determine primary location for denormalized fields
+  let primaryLat = parseFloat(lat);
+  let primaryLon = parseFloat(lon);
+  let primaryVillage = village;
+  let primaryCommune = commune;
+
+  if (locations.length > 0) {
+    const primary = locations.find(l => l.is_primary) || locations[0];
+    const pLat = parseFloat(primary.lat);
+    const pLon = parseFloat(primary.lon);
+    if (!Number.isNaN(pLat)) primaryLat = pLat;
+    if (!Number.isNaN(pLon)) primaryLon = pLon;
+    if (primary.village) primaryVillage = primary.village;
+    if (primary.commune) primaryCommune = primary.commune;
+  }
+
+  const conn = await pool.getConnection();
   try {
-    const [result] = await pool.query(`
+    await conn.beginTransaction();
+
+    // Handle parent_id update
+    let parentIdValue = undefined; // undefined = don't change
+    if (parent_id !== undefined) {
+      if (parent_id === null || parent_id === '' || parent_id === 'null') {
+        parentIdValue = null;
+      } else {
+        parentIdValue = parseInt(parent_id);
+        if (Number.isNaN(parentIdValue)) parentIdValue = null;
+      }
+    }
+
+    const updateFields = `
       UPDATE initiatives SET
         initiative = ?, description = ?, village = ?, commune = ?, zone_intervention = ?,
-        actor_type = ?, year = ?, activities = ?, lat = ?, lon = ?,
+        actor_type = ?, year = ?, activities = ?, lat = ?, lon = ?, location_type = ?,
         contact_email = ?, contact_phone = ?, person_name = ?,
-        website = ?, social_media = ?, videos = ?, extra_fields = ?
+        website = ?, social_media = ?, videos = ?, extra_fields = ?,
+        bailleurs = ?, organisation = ?, point_contact = ?, duree = ?
+        ${parentIdValue !== undefined ? ', parent_id = ?' : ''}
       WHERE id = ?
-    `, [
+    `;
+
+    const updateParams = [
       initiative,
       description,
-      village,
-      commune,
+      primaryVillage,
+      primaryCommune,
       zone_intervention,
       actor_type,
       parseInt(year),
       formattedActivities,
-      parseFloat(lat),
-      parseFloat(lon),
+      Number.isNaN(primaryLat) ? null : primaryLat,
+      Number.isNaN(primaryLon) ? null : primaryLon,
+      locType,
       contact_email,
       contact_phone,
       person_name,
@@ -492,17 +727,56 @@ router.put('/:id', authenticateToken, async (req, res) => {
       social_media,
       videos,
       extraFieldsJson,
-      id
-    ]);
+      bailleurs || null,
+      organisation || null,
+      point_contact || null,
+      duree || null,
+    ];
+    if (parentIdValue !== undefined) updateParams.push(parentIdValue);
+    updateParams.push(id);
+
+    const [result] = await conn.query(updateFields, updateParams);
 
     if (result.affectedRows === 0) {
+      await conn.rollback();
       return res.status(404).json({ error: "Initiative non trouvée pour mise à jour" });
     }
 
+    // Replace locations: delete existing, re-insert
+    await conn.query('DELETE FROM initiative_locations WHERE initiative_id = ?', [id]);
+
+    if (locations.length > 0) {
+      const insertLocSQL = `INSERT INTO initiative_locations (initiative_id, label, lat, lon, village, commune, is_primary) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+      for (let idx = 0; idx < locations.length; idx++) {
+        const loc = locations[idx];
+        const locLat = parseFloat(loc.lat);
+        const locLon = parseFloat(loc.lon);
+        await conn.query(insertLocSQL, [
+          id,
+          loc.label || null,
+          Number.isNaN(locLat) ? null : locLat,
+          Number.isNaN(locLon) ? null : locLon,
+          loc.village || null,
+          loc.commune || null,
+          !!loc.is_primary
+        ]);
+      }
+    } else if (!Number.isNaN(primaryLat) && !Number.isNaN(primaryLon)) {
+      // Backward compat: no locations array but lat/lon present
+      await conn.query(
+        `INSERT INTO initiative_locations (initiative_id, label, lat, lon, village, commune, is_primary) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [id, 'Localisation principale', primaryLat, primaryLon, primaryVillage || null, primaryCommune || null, true]
+      );
+    }
+
+    await conn.commit();
     res.json({ message: "Initiative mise à jour" });
   } catch (err) {
+    await conn.rollback();
     console.error("Erreur PUT /api/data/:id :", err);
     res.status(500).json({ error: "Erreur serveur" });
+  } finally {
+    conn.release();
   }
 });
 module.exports = router;
