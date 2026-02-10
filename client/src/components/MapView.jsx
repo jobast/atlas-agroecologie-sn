@@ -22,6 +22,17 @@ const colorForActivity = (a) => {
   return baseGreen;
 };
 
+const activityBadgeStyle = (a) => {
+  if (!a) return 'bg-gray-100 text-gray-600';
+  const key = a.toLowerCase();
+  if (key.includes('production')) return 'bg-green-50 text-green-700 ring-1 ring-green-200';
+  if (key.includes('transformation')) return 'bg-orange-50 text-orange-700 ring-1 ring-orange-200';
+  if (key.includes('formation')) return 'bg-blue-50 text-blue-700 ring-1 ring-blue-200';
+  if (key.includes('gouver')) return 'bg-purple-50 text-purple-700 ring-1 ring-purple-200';
+  if (key.includes('commerce')) return 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200';
+  return 'bg-gray-50 text-gray-600 ring-1 ring-gray-200';
+};
+
 function FitBounds({ points }) {
   return null; // désactivé pour conserver l'emprise par défaut
 }
@@ -163,14 +174,47 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
                 icon={icon}
                 eventHandlers={{ click: () => onSelect?.(pt.id, pt) }}
               >
-                <Popup>
-                  <div className="text-sm space-y-1">
-                    <div className="font-semibold">{pt.initiative || 'Sans nom'}</div>
-                    <div className="text-gray-700">{pt.commune || pt.village || 'Localisation inconnue'}</div>
-                    <div className="text-gray-600">{pt.actor_type || 'Type non renseigné'}</div>
-                    {pt.activities && pt.activities.length > 0 && (
-                      <div className="text-gray-600">Activités : {pt.activities.join(', ')}</div>
-                    )}
+                <Popup maxWidth={600} minWidth={420} className="custom-popup">
+                  <div className="-mx-3 -my-2">
+                    {/* Header */}
+                    <div className="bg-emerald-700 px-6 py-5">
+                      <h3 className="font-semibold text-white text-base leading-snug">{pt.initiative || 'Sans nom'}</h3>
+                      <div className="text-emerald-200 text-sm mt-1.5">{pt.actor_type || 'Type non renseigné'}</div>
+                    </div>
+                    {/* Body */}
+                    <div className="px-6 py-5 space-y-5">
+                      {/* Activities */}
+                      {pt.activities && pt.activities.length > 0 && (
+                        <div className="flex flex-wrap gap-2.5">
+                          {pt.activities.map((act, i) => (
+                            <span key={i} className={`inline-block text-sm font-medium px-3 py-1 rounded-full ${activityBadgeStyle(act)}`}>{act}</span>
+                          ))}
+                        </div>
+                      )}
+                      {/* Location */}
+                      <div className="flex items-center gap-3 text-gray-700 text-sm">
+                        <svg className="w-[18px] h-[18px] shrink-0 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        <span>{pt.commune || pt.village || 'Localisation inconnue'}</span>
+                      </div>
+                      {/* Website */}
+                      {pt.website && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <svg className="w-[18px] h-[18px] shrink-0 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                          <a href={pt.website.startsWith('http') ? pt.website : `https://${pt.website}`} target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline truncate">{pt.website.replace(/^https?:\/\//, '')}</a>
+                        </div>
+                      )}
+                      {/* Contact */}
+                      {(pt.person_name || pt.contact_email || pt.contact_phone) && (
+                        <div className="flex items-start gap-3 text-sm border-t border-gray-100 pt-5">
+                          <svg className="w-[18px] h-[18px] shrink-0 text-emerald-600 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                          <div className="space-y-1.5 text-gray-600">
+                            {pt.person_name && <div className="font-medium text-gray-800">{pt.person_name}</div>}
+                            {pt.contact_phone && <div>{pt.contact_phone}</div>}
+                            {pt.contact_email && <div className="text-emerald-700">{pt.contact_email}</div>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </Popup>
               </Marker>
