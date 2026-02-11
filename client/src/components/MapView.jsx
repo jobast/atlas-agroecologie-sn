@@ -38,7 +38,7 @@ function FitBounds({ points }) {
   return null; // désactivé pour conserver l'emprise par défaut
 }
 
-function FullExtentControl({ className = '' }) {
+function FullExtentControl({ bounds, className = '' }) {
   const { t } = useTranslation();
   const map = useMap();
   return (
@@ -46,7 +46,7 @@ function FullExtentControl({ className = '' }) {
       type="button"
       aria-label={t('map.global_view')}
       title={t('map.global_view')}
-      onClick={() => map.fitBounds(initialBounds, { padding: [20, 20] })}
+      onClick={() => map.fitBounds(bounds, { padding: [20, 20] })}
       className={`bg-white rounded shadow border border-gray-200 text-gray-700 hover:bg-gray-50 active:bg-gray-100 w-9 h-9 flex items-center justify-center ${className}`}
     >
       <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -134,7 +134,7 @@ export default function MapView({ points = [], selectedId, onSelect, basemap, se
               <path d="M4 15l8 4 8-4" />
             </svg>
           </button>
-          <FullExtentControl />
+          <FullExtentControl bounds={initialBounds} />
         </div>
       </div>
       <FitBounds points={points} />
