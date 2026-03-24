@@ -38,6 +38,7 @@ app.use((req, res, next) => {
 app.use(helmet({
   contentSecurityPolicy: false,  // désactivé pour ne pas casser le SPA
   crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
