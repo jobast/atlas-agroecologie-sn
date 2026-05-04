@@ -1,0 +1,89 @@
+# Atlas Agroecologie - Docker Compose
+#
+# Standalone deployment. Plug into a shared reverse proxy (Traefik or Caddy)
+# by joining the external `proxy` network and using the Traefik labels below.
+#
+# Required env vars (load from .env at the project root):
+#   POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+#   JWT_SECRET, ADMIN_EMAIL
+#   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+#   ALLOWED_ORIGINS (e.g. https://atlas.creates.ngo)
+#   FRONTEND_URL (e.g. https://atlas.creates.ngo)
+#   ATLAS_HOST (the public domain, used by Traefik labels)
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: atlas_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - internal
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: atlas-agroecologie:local
+    container_name: atlas_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 5050
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      FRONTEND_URL: ${FRONTEND_URL}
+    volumes:
+      # Persist user-uploaded photos outside the image
+      - uploads:/app/server/uploads
+    # When NOT using a reverse proxy, expose the port directly:
+    ports:
+      - "127.0.0.1:5050:5050"
+    networks:
+      - internal
+      - proxy
+    # Traefik labels (ignored if the `proxy` network has no Traefik attached).
+    # Adjust router/cert resolver names to match your existing Traefik setup.
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.atlas.rule=Host(`${ATLAS_HOST}`)"
+      - "traefik.http.routers.atlas.entrypoints=websecure"
+      - "traefik.http.routers.atlas.tls.certresolver=letsencrypt"
+      - "traefik.http.services.atlas.loadbalancer.server.port=5050"
+
+volumes:
+  pg_data:
+  uploads:
+
+networks:
+  internal:
+  proxy:
+    # Reuse the existing reverse-proxy network if it already exists on the host
+    # (e.g. from creates-platform). Set `external: true` if so.
+    external: true
+    name: proxy
