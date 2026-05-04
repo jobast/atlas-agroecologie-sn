@@ -268,7 +268,18 @@
     "initiative_saved": "Initiative enregistrée (en attente de validation).",
     "token_missing": "Token manquant. Vous devez être connecté.",
     "mobile_version": "Version mobile",
-    "mobile_desc": "Formulaire optimisé pour le terrain (mêmes champs que la version web)."
+    "mobile_desc": "Formulaire optimisé pour le terrain (mêmes champs que la version web).",
+    "validation": {
+      "title": "Veuillez compléter les champs obligatoires :",
+      "year_invalid": "L'année doit être un nombre entre 1900 et {{max}}.",
+      "gps_required": "Coordonnées GPS (latitude et longitude)",
+      "gps_invalid": "Coordonnées GPS invalides (latitude entre -90 et 90, longitude entre -180 et 180)",
+      "location_at_least_one": "Au moins un lieu avec coordonnées GPS",
+      "photo_too_large": "Une photo dépasse la taille maximale (5 Mo).",
+      "network_error": "Erreur réseau. Vérifiez votre connexion internet et réessayez.",
+      "server_error": "Erreur du serveur. Réessayez dans quelques instants.",
+      "session_expired": "Votre session a expiré. Veuillez vous reconnecter."
+    }
   },
   "edit": {
     "title": "Modifier l'initiative",

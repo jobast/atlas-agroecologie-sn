@@ -268,7 +268,18 @@
     "initiative_saved": "Jëfkaay bi denc na (ngi xaar dëggal).",
     "token_missing": "Amul token. War nga dugg.",
     "mobile_version": "Version telefon",
-    "mobile_desc": "Fiirnde ci wàllu liggéey bi (menm bërëb yi ci wéb bi)."
+    "mobile_desc": "Fiirnde ci wàllu liggéey bi (menm bërëb yi ci wéb bi).",
+    "validation": {
+      "title": "Sukkandikul bërëb yi war:",
+      "year_invalid": "At bi war na nekk lim ci diggante 1900 ak {{max}}.",
+      "gps_required": "Koordine GPS (latitude ak longitude)",
+      "gps_invalid": "Koordine GPS yi baaxul (latitude ci diggante -90 ak 90, longitude ci diggante -180 ak 180)",
+      "location_at_least_one": "Lu yam benn bërëb ak koordine GPS",
+      "photo_too_large": "Ab nataal ëpp na 5 Mo.",
+      "network_error": "Njuumte ci internet. Xoolal sa konekk te jéémaatal.",
+      "server_error": "Njuumte ci serveer bi. Jéémaatal léeg-léeg.",
+      "session_expired": "Sa session jeex na. Duggaatal."
+    }
   },
   "edit": {
     "title": "Soppil jëfkaay bi",

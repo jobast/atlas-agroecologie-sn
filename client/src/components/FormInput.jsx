@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, LayersControl } from 'react-leaflet';
@@ -107,6 +107,9 @@ export default function FormInput({ variant = 'default' }) {
   const [socialMedia, setSocialMedia] = useState([]);
   const [socialLinks, setSocialLinks] = useState({});
   const accuracyWarning = gpsAccuracy !== null && gpsAccuracy > 20;
+
+  const [formErrors, setFormErrors] = useState([]);
+  const errorBannerRef = useRef(null);
 
   useEffect(() => {
     const params = currentDytael ? `?dytael_id=${currentDytael.id}` : '';
@@ -247,8 +250,90 @@ export default function FormInput({ variant = 'default' }) {
     );
   };
 
+  const validateForm = () => {
+    const errors = [];
+    const isProgramme = entryType === 'programme';
+    const isSubInitiative = !!parentIdFromUrl;
+    const trim = (v) => (typeof v === 'string' ? v.trim() : v);
+
+    // Common fields
+    if (!trim(formData.initiative)) {
+      errors.push(isProgramme ? t('form.programme_name') : t('form.initiative_name'));
+    }
+    if (!trim(formData.description)) {
+      errors.push(t('form.description'));
+    }
+
+    if (!isProgramme) {
+      if (!trim(formData.actor_type)) errors.push(t('form.actor_type'));
+
+      // Year: required and must be a valid number in range
+      const yearStr = trim(formData.year);
+      const currentYear = new Date().getFullYear();
+      if (!yearStr) {
+        errors.push(t('form.year'));
+      } else {
+        const yearInt = parseInt(yearStr, 10);
+        if (Number.isNaN(yearInt) || yearInt < 1900 || yearInt > currentYear) {
+          errors.push(t('form.validation.year_invalid', { max: currentYear }));
+        }
+      }
+
+      if (!trim(formData.person_name)) errors.push(t('form.contact_name'));
+      if (!trim(formData.contact_phone)) errors.push(t('form.phone'));
+
+      // Location validation depends on mode
+      if (formData.location_type === 'point') {
+        if (!trim(formData.village)) errors.push(t('form.village'));
+        const latNum = parseFloat(formData.lat);
+        const lonNum = parseFloat(formData.lon);
+        if (Number.isNaN(latNum) || Number.isNaN(lonNum)) {
+          errors.push(t('form.validation.gps_required'));
+        } else if (latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
+          errors.push(t('form.validation.gps_invalid'));
+        }
+      } else if (formData.location_type === 'multi') {
+        const valid = locations.some(loc => {
+          const lt = parseFloat(loc.lat);
+          const ln = parseFloat(loc.lon);
+          return !Number.isNaN(lt) && !Number.isNaN(ln) && lt >= -90 && lt <= 90 && ln >= -180 && ln <= 180;
+        });
+        if (!valid) errors.push(t('form.validation.location_at_least_one'));
+      } else if (formData.location_type === 'zone') {
+        if (!trim(formData.commune)) errors.push(t('form.commune'));
+      }
+    }
+
+    // Custom required fields
+    customFields.forEach((f) => {
+      if (!f.required) return;
+      const key = f.field_key || f.key;
+      if (!trim(customValues[key])) {
+        errors.push(f.field_label || f.label || key);
+      }
+    });
+
+    // Photo size check (defensive: handleChange already filters but file inputs can be set programmatically)
+    if (formData.photos.some(file => file && file.size > MAX_PHOTO_SIZE)) {
+      errors.push(t('form.validation.photo_too_large'));
+    }
+
+    return errors;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      setFormErrors(validationErrors);
+      // Scroll the error banner into view on next tick
+      setTimeout(() => {
+        errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 0);
+      return;
+    }
+    setFormErrors([]);
 
   const data = new FormData();
 
@@ -379,7 +464,28 @@ export default function FormInput({ variant = 'default' }) {
     setPhotoNotice('');
   } catch (error) {
     console.error("Erreur lors de la soumission :", error);
-    alert(t('common.submit_error'));
+    let message;
+    const status = error.response?.status;
+    const serverMsg = error.response?.data?.error;
+    if (serverMsg) {
+      // Server returned a structured error (validation, year/lat/lon, etc.)
+      message = serverMsg;
+    } else if (status === 401 || status === 403) {
+      message = t('form.validation.session_expired');
+    } else if (status >= 500) {
+      message = t('form.validation.server_error');
+    } else if (!error.response && error.message && error.message !== 'Network Error') {
+      // Local thrown error (e.g. token missing)
+      message = error.message;
+    } else if (!error.response) {
+      message = t('form.validation.network_error');
+    } else {
+      message = t('common.submit_error');
+    }
+    setFormErrors([message]);
+    setTimeout(() => {
+      errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
   }
 
   };
@@ -412,6 +518,43 @@ export default function FormInput({ variant = 'default' }) {
           </h2>
           <p className="text-xs text-gray-400 mt-1">{t('common.required_fields_text', { defaultValue: "Les champs marqués d'un * sont obligatoires" }).split('*')[0]}<span className="text-red-400">*</span>{t('common.required_fields_text').split('*')[1]}</p>
         </div>
+
+        {/* Validation / submission error banner */}
+        {formErrors.length > 0 && (
+          <div
+            ref={errorBannerRef}
+            role="alert"
+            className="bg-red-50 border border-red-200 rounded-xl px-5 py-4"
+          >
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-red-800 mb-1">
+                  {formErrors.length === 1 ? t('common.error') : t('form.validation.title')}
+                </div>
+                {formErrors.length === 1 ? (
+                  <div className="text-sm text-red-700">{formErrors[0]}</div>
+                ) : (
+                  <ul className="text-sm text-red-700 list-disc pl-5 space-y-0.5">
+                    {formErrors.map((err, i) => (<li key={i}>{err}</li>))}
+                  </ul>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormErrors([])}
+                className="shrink-0 text-red-400 hover:text-red-600 transition-colors"
+                aria-label={t('common.close')}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Parent banner when creating a sub-initiative */}
         {parentIdFromUrl && parentName && (

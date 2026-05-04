@@ -182,6 +182,18 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
       return [];
     };
 
+    // Validate required fields (defense in depth — client also validates)
+    const trimStr = (v) => (typeof v === 'string' ? v.trim() : '');
+    const missing = [];
+    if (!trimStr(initiative)) missing.push("nom de l'initiative");
+    if (!trimStr(description)) missing.push('description');
+    if (missing.length) {
+      await conn.rollback();
+      return res.status(400).json({
+        error: `Champs obligatoires manquants : ${missing.join(', ')}.`
+      });
+    }
+
     // Validate parent_id if provided
     let parentIdInt = null;
     if (parent_id) {
