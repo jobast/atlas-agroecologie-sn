@@ -33,8 +33,31 @@ if [ ! -f "$ENV_FILE" ]; then
   echo "ERROR: no env file at $PROJECT_ROOT/server/.env(.production)" >&2
   exit 1
 fi
-# shellcheck disable=SC1090
-set -a; . "$ENV_FILE"; set +a
+# Parse .env safely without shell expansion (values may contain $, `, etc.)
+load_env() {
+  local file="$1"
+  local line key val
+  while IFS= read -r line || [ -n "$line" ]; do
+    # Strip CR (CRLF files)
+    line="${line%$'\r'}"
+    # Skip blank lines and comments
+    [[ -z "${line// }" ]] && continue
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    # Strip optional leading 'export '
+    line="${line#export }"
+    # Match KEY=VALUE
+    if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=(.*)$ ]]; then
+      key="${BASH_REMATCH[1]}"
+      val="${BASH_REMATCH[2]}"
+      # Trim surrounding single or double quotes
+      if [[ "$val" =~ ^\"(.*)\"$ ]] || [[ "$val" =~ ^\'(.*)\'$ ]]; then
+        val="${BASH_REMATCH[1]}"
+      fi
+      export "$key=$val"
+    fi
+  done < "$file"
+}
+load_env "$ENV_FILE"
 
 : "${DB_HOST:?DB_HOST not set in env}"
 : "${DB_USER:?DB_USER not set in env}"
