@@ -30,7 +30,7 @@ export default function LandingPage() {
       user = JSON.parse(localStorage.getItem('user'));
       if (user && user.id && user.role) {
         isAuthenticated = true;
-        isAdmin = ['admin', 'dytael_admin', 'dytaes_admin'].includes(user.role);
+        isAdmin = ['admin', 'dytael_admin', 'dytaes_admin', 'super_admin'].includes(user.role);
       } else {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -45,11 +45,19 @@ export default function LandingPage() {
   const p = (path) => `/${slug}${path}`;
 
   const handleAddInitiative = () => {
-    navigate(isAuthenticated ? p('/submit') : '/login');
+    if (isAuthenticated) {
+      navigate(p('/submit'));
+    } else {
+      navigate('/login', { state: { reason: 'submit-initiative' } });
+    }
   };
 
   const handleEditInitiative = () => {
-    navigate(isAuthenticated ? p('/my-initiatives') : '/login');
+    if (isAuthenticated) {
+      navigate(p('/my-initiatives'));
+    } else {
+      navigate('/login', { state: { reason: 'submit-initiative' } });
+    }
   };
 
   const titleSuffix = isNational
@@ -60,6 +68,9 @@ export default function LandingPage() {
     ? t('landing.description_national')
     : t('landing.description_local', { name: titleSuffix });
 
+  // National (DyTAES) view is read-only by design: no initiative submission,
+  // no per-user submissions list. Each DyTAEL keeps governance over its own
+  // contributions, so submit/edit actions only appear inside a DyTAEL space.
   const actions = [
     {
       label: t('landing.explore_map'),
@@ -82,7 +93,7 @@ export default function LandingPage() {
         </svg>
       ),
     },
-    {
+    !isNational && {
       label: t('landing.add_initiative'),
       description: isAuthenticated ? t('landing.add_initiative_desc_auth') : t('landing.add_initiative_desc_noauth'),
       onClick: handleAddInitiative,
@@ -92,7 +103,7 @@ export default function LandingPage() {
         </svg>
       ),
     },
-    {
+    !isNational && {
       label: t('landing.my_initiatives'),
       description: isAuthenticated ? t('landing.my_initiatives_desc_auth') : t('landing.my_initiatives_desc_noauth'),
       onClick: handleEditInitiative,
@@ -102,7 +113,7 @@ export default function LandingPage() {
         </svg>
       ),
     },
-  ];
+  ].filter(Boolean);
 
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col relative overflow-hidden text-emerald-900">

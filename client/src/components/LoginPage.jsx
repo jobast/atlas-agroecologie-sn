@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 export default function LoginPage() {
@@ -9,7 +9,11 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
+  // Reason banner — shown when the user was redirected here from a gated
+  // action (e.g. clicking "Add initiative" without a session).
+  const redirectReason = location.state?.reason || null;
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -54,6 +58,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="max-w-md w-full bg-white p-8 rounded shadow-md">
         <h2 className="text-2xl font-bold mb-6 text-center">{t('auth.login_title')}</h2>
+        {redirectReason === 'submit-initiative' && (
+          <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {t('auth.login_required_to_submit')}
+          </div>
+        )}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">{t('auth.email')}</label>
