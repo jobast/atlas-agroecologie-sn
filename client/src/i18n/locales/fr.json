@@ -159,7 +159,8 @@
     "subtitle": "Cartographie participative des acteurs de la transition agroécologique",
     "national_view": "Vue nationale",
     "national_desc": "Toutes les initiatives agroécologiques du Sénégal",
-    "territorial_space": "Espace territorial"
+    "territorial_space": "Espace territorial",
+    "your_dytael": "Votre territoire"
   },
   "form": {
     "new_initiative": "Nouvelle Initiative",
