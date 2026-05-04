@@ -12,3 +12,12 @@ assets/
 
 # Server-local
 client/package-lock.json
+
+# User uploads (photos) - never commit
+server/uploads/
+
+# Local DB dumps / backup artefacts
+exports/
+backups/
+*.sql.gz
+*.tar.gz
