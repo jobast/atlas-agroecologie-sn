@@ -20,7 +20,7 @@ async function resolveSubmissionRecipients(dytaelId) {
   try {
     const [rows] = await pool.query(
       `SELECT email FROM users
-       WHERE dytael_id = ? AND role IN ('dytael_admin', 'admin') AND confirmed = 1`,
+       WHERE dytael_id = ? AND role IN ('dytael_admin', 'admin', 'super_admin') AND confirmed = true`,
       [dytaelId]
     );
     const emails = rows.map(r => r.email).filter(Boolean);
