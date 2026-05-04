@@ -52,7 +52,7 @@ async function attachPhotos(rows, req) {
   if (!rows || rows.length === 0) return rows;
   const ids = rows.map(r => r.id);
   const [photoRows] = await pool.query(
-    'SELECT initiative_id, filename FROM photos WHERE initiative_id IN (?)',
+    'SELECT initiative_id, filename FROM photos WHERE initiative_id = ANY(?)',
     [ids]
   );
   const grouped = {};
@@ -67,7 +67,7 @@ async function attachChildren(rows) {
   if (!rows || rows.length === 0) return rows;
   const ids = rows.map(r => r.id);
   const [childRows] = await pool.query(
-    'SELECT id, parent_id, initiative, commune, status FROM initiatives WHERE parent_id IN (?)',
+    'SELECT id, parent_id, initiative, commune, status FROM initiatives WHERE parent_id = ANY(?)',
     [ids]
   );
   const grouped = {};
@@ -92,7 +92,7 @@ async function attachParent(rows) {
   const parentIds = [...new Set(rows.filter(r => r.parent_id).map(r => r.parent_id))];
   if (parentIds.length === 0) return rows;
   const [parentRows] = await pool.query(
-    'SELECT id, initiative FROM initiatives WHERE id IN (?)',
+    'SELECT id, initiative FROM initiatives WHERE id = ANY(?)',
     [parentIds]
   );
   const parentMap = {};
@@ -107,7 +107,7 @@ async function attachLocations(rows) {
   if (!rows || rows.length === 0) return rows;
   const ids = rows.map(r => r.id);
   const [locRows] = await pool.query(
-    'SELECT id, initiative_id, label, lat, lon, village, commune, is_primary FROM initiative_locations WHERE initiative_id IN (?) ORDER BY is_primary DESC, id ASC',
+    'SELECT id, initiative_id, label, lat, lon, village, commune, is_primary FROM initiative_locations WHERE initiative_id = ANY(?) ORDER BY is_primary DESC, id ASC',
     [ids]
   );
   const grouped = {};
