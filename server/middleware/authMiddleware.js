@@ -1,7 +1,10 @@
 const jwt = require('jsonwebtoken');
 const SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
-const ROLE_HIERARCHY = { 'editor': 1, 'dytael_admin': 2, 'dytaes_admin': 3 };
+// `super_admin` is a transitional break-glass role: full powers, no scoping.
+// It is NOT part of the governance model — only used while operators bootstrap
+// real DyTAEL admins. Should be removed once ownership has been handed over.
+const ROLE_HIERARCHY = { 'editor': 1, 'dytael_admin': 2, 'dytaes_admin': 3, 'super_admin': 4 };
 
 // Roles whose authority is read-only by design.
 // DyTAES holds national oversight: it can consult all DyTAELs but never
@@ -20,6 +23,10 @@ function hasRole(userRole, requiredRole) {
 
 function isReadOnlyRole(role) {
   return READ_ONLY_ROLES.has(normalizeRole(role));
+}
+
+function isSuperAdmin(role) {
+  return normalizeRole(role) === 'super_admin';
 }
 
 function authenticateToken(req, res, next) {
@@ -65,5 +72,6 @@ module.exports = {
   denyReadOnlyRoles,
   hasRole,
   isReadOnlyRole,
+  isSuperAdmin,
   normalizeRole
 };

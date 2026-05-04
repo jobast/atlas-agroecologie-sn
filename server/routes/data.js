@@ -3,7 +3,7 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const pool = require('../config/db');
-const { authenticateToken, requireRole, denyReadOnlyRoles, hasRole, normalizeRole } = require('../middleware/authMiddleware');
+const { authenticateToken, requireRole, denyReadOnlyRoles, hasRole, isSuperAdmin, normalizeRole } = require('../middleware/authMiddleware');
 const jwt = require('jsonwebtoken');
 const SECRET = process.env.JWT_SECRET || 'supersecretkey';
 const { sendNewSubmissionAlert } = require('../utils/mailer');
@@ -213,7 +213,12 @@ router.post('/', authenticateToken, denyReadOnlyRoles, upload.array('photos', 5)
         return res.status(400).json({ error: 'Programme parent introuvable.' });
       }
       parentDytaelId = parentRows[0].dytael_id;
-      if (parentDytaelId != null && req.user.dytael_id != null && parentDytaelId !== req.user.dytael_id) {
+      if (
+        !isSuperAdmin(req.user.role) &&
+        parentDytaelId != null &&
+        req.user.dytael_id != null &&
+        parentDytaelId !== req.user.dytael_id
+      ) {
         await conn.rollback();
         return res.status(403).json({ error: 'Vous ne pouvez pas ajouter une initiative à un programme situé dans un autre DyTAEL.' });
       }
@@ -276,9 +281,13 @@ router.post('/', authenticateToken, denyReadOnlyRoles, upload.array('photos', 5)
     }
 
     // dytael_id: a sub-initiative inherits its parent's DyTAEL (canonical source),
-    // otherwise it falls back to the submitter's DyTAEL. The body's dytael_id is
-    // ignored — DyTAES is read-only and editors are tied to their own DyTAEL.
+    // otherwise it falls back to the submitter's DyTAEL. super_admin can override
+    // explicitly via body.dytael_id; everyone else is locked to their own DyTAEL.
     let dytaelId = parentDytaelId != null ? parentDytaelId : (req.user.dytael_id || null);
+    if (isSuperAdmin(req.user.role) && req.body.dytael_id) {
+      const overrideDytael = parseInt(req.body.dytael_id);
+      if (!Number.isNaN(overrideDytael)) dytaelId = overrideDytael;
+    }
 
     // Determine effective location_type
     const validTypes = ['point', 'multi', 'zone'];
@@ -441,15 +450,18 @@ router.get('/', async (req, res) => {
 });
 
 // ✅ DELETE /api/data/:id – suppression (admin DyTAEL ou propriétaire)
-// DyTAES bloquée par denyReadOnlyRoles (souveraineté DyTAEL).
+// DyTAES bloquée par denyReadOnlyRoles (souveraineté DyTAEL). super_admin bypass.
 router.delete('/:id', authenticateToken, denyReadOnlyRoles, async (req, res) => {
   const { id } = req.params;
-  const isAdmin = hasRole(normalizeRole(req.user?.role), 'dytael_admin');
+  const role = normalizeRole(req.user?.role);
+  const isAdmin = hasRole(role, 'dytael_admin');
 
   try {
     let sql, params;
-    if (isAdmin) {
-      // dytael_admin: only within their own DyTAEL
+    if (isSuperAdmin(role)) {
+      sql = 'DELETE FROM initiatives WHERE id = ?';
+      params = [id];
+    } else if (isAdmin) {
       sql = 'DELETE FROM initiatives WHERE id = ? AND dytael_id = ?';
       params = [id, req.user.dytael_id];
     } else {
@@ -469,14 +481,26 @@ router.delete('/:id', authenticateToken, denyReadOnlyRoles, async (req, res) => 
   }
 });
 
-// ✅ PUT /api/data/:id/validate – approuver (DyTAEL admin uniquement, scope DyTAEL)
+// Build a status-update SQL + params, scoped by DyTAEL unless super_admin.
+function buildStatusUpdate(req, id, newStatus, extraWhere = '') {
+  if (isSuperAdmin(req.user.role)) {
+    return {
+      sql: `UPDATE initiatives SET status = ? WHERE id = ?${extraWhere}`,
+      params: [newStatus, id]
+    };
+  }
+  return {
+    sql: `UPDATE initiatives SET status = ? WHERE id = ? AND dytael_id = ?${extraWhere}`,
+    params: [newStatus, id, req.user.dytael_id]
+  };
+}
+
+// ✅ PUT /api/data/:id/validate – approuver (DyTAEL admin, scope DyTAEL)
 router.put('/:id/validate', authenticateToken, denyReadOnlyRoles, requireRole('dytael_admin'), async (req, res) => {
   const { id } = req.params;
   try {
-    const [result] = await pool.query(
-      'UPDATE initiatives SET status = ? WHERE id = ? AND dytael_id = ?',
-      ['approved', id, req.user.dytael_id]
-    );
+    const { sql, params } = buildStatusUpdate(req, id, 'approved');
+    const [result] = await pool.query(sql, params);
     if (result.affectedRows === 0) {
       return res.status(403).json({ error: 'Non autorisé ou initiative introuvable.' });
     }
@@ -487,14 +511,12 @@ router.put('/:id/validate', authenticateToken, denyReadOnlyRoles, requireRole('d
   }
 });
 
-// ✅ PUT /api/data/:id/reject – rejeter (DyTAEL admin uniquement, scope DyTAEL)
+// ✅ PUT /api/data/:id/reject – rejeter (DyTAEL admin, scope DyTAEL)
 router.put('/:id/reject', authenticateToken, denyReadOnlyRoles, requireRole('dytael_admin'), async (req, res) => {
   const { id } = req.params;
   try {
-    const [result] = await pool.query(
-      'UPDATE initiatives SET status = ? WHERE id = ? AND dytael_id = ?',
-      ['rejected', id, req.user.dytael_id]
-    );
+    const { sql, params } = buildStatusUpdate(req, id, 'rejected');
+    const [result] = await pool.query(sql, params);
     if (result.affectedRows === 0) {
       return res.status(403).json({ error: 'Non autorisé ou initiative introuvable.' });
     }
@@ -509,10 +531,8 @@ router.put('/:id/reject', authenticateToken, denyReadOnlyRoles, requireRole('dyt
 router.put('/:id/cancel-delete', authenticateToken, denyReadOnlyRoles, requireRole('dytael_admin'), async (req, res) => {
   const { id } = req.params;
   try {
-    const [result] = await pool.query(
-      'UPDATE initiatives SET status = ? WHERE id = ? AND status = ? AND dytael_id = ?',
-      ['approved', id, 'delete_requested', req.user.dytael_id]
-    );
+    const { sql, params } = buildStatusUpdate(req, id, 'approved', " AND status = 'delete_requested'");
+    const [result] = await pool.query(sql, params);
     if (result.affectedRows === 0) {
       return res.status(403).json({ error: 'Non autorisé ou initiative introuvable.' });
     }
@@ -586,6 +606,7 @@ function tryDecodeUser(req) {
 function canViewAnyStatus(user, initiative) {
   if (!user) return false;
   const role = normalizeRole(user.role);
+  if (role === 'super_admin') return true;
   if (role === 'dytaes_admin') return true; // national read-only access
   if (role === 'dytael_admin' && initiative.dytael_id === user.dytael_id) return true;
   if (initiative.user_id === user.id) return true;
@@ -698,7 +719,7 @@ router.put('/:id', authenticateToken, denyReadOnlyRoles, async (req, res) => {
     const isDytaelAdmin = userRole === 'dytael_admin';
     const isOwner = existing.user_id === req.user.id;
     const sameDytael = existing.dytael_id != null && existing.dytael_id === req.user.dytael_id;
-    const allowed = (isDytaelAdmin && sameDytael) || isOwner;
+    const allowed = isSuperAdmin(userRole) || (isDytaelAdmin && sameDytael) || isOwner;
     if (!allowed) {
       return res.status(403).json({ error: "Vous n'avez pas l'autorisation de modifier cette initiative." });
     }

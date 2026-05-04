@@ -1,6 +1,6 @@
 const express = require('express');
 const pool = require('../config/db');
-const { authenticateToken, requireRole, denyReadOnlyRoles } = require('../middleware/authMiddleware');
+const { authenticateToken, requireRole, denyReadOnlyRoles, isSuperAdmin } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -29,13 +29,26 @@ router.post('/', authenticateToken, denyReadOnlyRoles, requireRole('dytael_admin
   if (!field_key || !field_label) {
     return res.status(400).json({ error: 'field_key et field_label sont requis' });
   }
-  if (!req.user.dytael_id) {
-    return res.status(403).json({ error: "Aucun DyTAEL associé à votre compte." });
+
+  // super_admin can pass body.dytael_id (or null for global). Everyone else
+  // is locked to their own DyTAEL.
+  let targetDytaelId;
+  if (isSuperAdmin(req.user.role)) {
+    targetDytaelId = req.body.dytael_id != null && req.body.dytael_id !== ''
+      ? parseInt(req.body.dytael_id)
+      : null;
+    if (targetDytaelId !== null && Number.isNaN(targetDytaelId)) targetDytaelId = null;
+  } else {
+    if (!req.user.dytael_id) {
+      return res.status(403).json({ error: "Aucun DyTAEL associé à votre compte." });
+    }
+    targetDytaelId = req.user.dytael_id;
   }
+
   try {
     await pool.query(
       'INSERT INTO custom_fields (field_key, field_label, field_type, required, dytael_id) VALUES (?, ?, ?, ?, ?)',
-      [field_key, field_label, field_type, !!required, req.user.dytael_id]
+      [field_key, field_label, field_type, !!required, targetDytaelId]
     );
     res.status(201).json({ message: 'Champ créé' });
   } catch (err) {
