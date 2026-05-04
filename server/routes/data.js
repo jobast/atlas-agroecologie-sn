@@ -3,7 +3,7 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const pool = require('../config/db');
-const { authenticateToken, requireRole, hasRole, normalizeRole } = require('../middleware/authMiddleware');
+const { authenticateToken, requireRole, denyReadOnlyRoles, hasRole, normalizeRole } = require('../middleware/authMiddleware');
 const jwt = require('jsonwebtoken');
 const SECRET = process.env.JWT_SECRET || 'supersecretkey';
 const { sendNewSubmissionAlert } = require('../utils/mailer');
@@ -127,7 +127,7 @@ async function attachLocations(rows) {
 }
 
 // ✅ POST /api/data – Créer une nouvelle initiative
-router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) => {
+router.post('/', authenticateToken, denyReadOnlyRoles, upload.array('photos', 5), async (req, res) => {
   console.log('POST /api/data — user:', req.user?.id, 'files:', req.files?.length || 0);
 
   const {
@@ -194,8 +194,10 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
       });
     }
 
-    // Validate parent_id if provided
+    // Validate parent_id if provided. A sub-initiative must live in the same
+    // DyTAEL as its parent programme, otherwise it crosses the silo.
     let parentIdInt = null;
+    let parentDytaelId = null;
     if (parent_id) {
       parentIdInt = parseInt(parent_id);
       if (Number.isNaN(parentIdInt)) {
@@ -209,6 +211,11 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
       if (parentRows.length === 0) {
         await conn.rollback();
         return res.status(400).json({ error: 'Programme parent introuvable.' });
+      }
+      parentDytaelId = parentRows[0].dytael_id;
+      if (parentDytaelId != null && req.user.dytael_id != null && parentDytaelId !== req.user.dytael_id) {
+        await conn.rollback();
+        return res.status(403).json({ error: 'Vous ne pouvez pas ajouter une initiative à un programme situé dans un autre DyTAEL.' });
       }
     }
 
@@ -268,12 +275,10 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
       return res.status(403).json({ error: 'Utilisateur inconnu.' });
     }
 
-    // dytael_id: dytaes_admin can specify explicitly, others use their own
-    const userRole = normalizeRole(req.user.role);
-    let dytaelId = req.user.dytael_id || null;
-    if (userRole === 'dytaes_admin' && req.body.dytael_id) {
-      dytaelId = parseInt(req.body.dytael_id);
-    }
+    // dytael_id: a sub-initiative inherits its parent's DyTAEL (canonical source),
+    // otherwise it falls back to the submitter's DyTAEL. The body's dytael_id is
+    // ignored — DyTAES is read-only and editors are tied to their own DyTAEL.
+    let dytaelId = parentDytaelId != null ? parentDytaelId : (req.user.dytael_id || null);
 
     // Determine effective location_type
     const validTypes = ['point', 'multi', 'zone'];
@@ -308,7 +313,14 @@ router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) 
     ]);
 
     const initiativeId = result.insertId;
-    await sendNewSubmissionAlert(initiative);
+
+    // Resolve DyTAEL name for the alert email
+    let dytaelName = null;
+    if (dytaelId) {
+      const [dRows] = await conn.query('SELECT name FROM dytaels WHERE id = ?', [dytaelId]);
+      dytaelName = dRows[0]?.name || null;
+    }
+    await sendNewSubmissionAlert({ name: initiative, dytaelId, dytaelName });
 
     // Insert locations
     if (locations.length > 0) {
@@ -428,23 +440,18 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ✅ DELETE /api/data/:id – suppression (admin ou propriétaire)
-router.delete('/:id', authenticateToken, async (req, res) => {
+// ✅ DELETE /api/data/:id – suppression (admin DyTAEL ou propriétaire)
+// DyTAES bloquée par denyReadOnlyRoles (souveraineté DyTAEL).
+router.delete('/:id', authenticateToken, denyReadOnlyRoles, async (req, res) => {
   const { id } = req.params;
   const isAdmin = hasRole(normalizeRole(req.user?.role), 'dytael_admin');
 
   try {
     let sql, params;
     if (isAdmin) {
-      // dytael_admin: can only delete within their DyTAEL; dytaes_admin: can delete any
-      const isDytaes = normalizeRole(req.user.role) === 'dytaes_admin';
-      if (isDytaes) {
-        sql = 'DELETE FROM initiatives WHERE id = ?';
-        params = [id];
-      } else {
-        sql = 'DELETE FROM initiatives WHERE id = ? AND dytael_id = ?';
-        params = [id, req.user.dytael_id];
-      }
+      // dytael_admin: only within their own DyTAEL
+      sql = 'DELETE FROM initiatives WHERE id = ? AND dytael_id = ?';
+      params = [id, req.user.dytael_id];
     } else {
       sql = 'DELETE FROM initiatives WHERE id = ? AND user_id = ?';
       params = [id, req.user.id];
@@ -462,20 +469,14 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ PUT /api/data/:id/validate – approuver une initiative (admin)
-router.put('/:id/validate', authenticateToken, requireRole('dytael_admin'), async (req, res) => {
+// ✅ PUT /api/data/:id/validate – approuver (DyTAEL admin uniquement, scope DyTAEL)
+router.put('/:id/validate', authenticateToken, denyReadOnlyRoles, requireRole('dytael_admin'), async (req, res) => {
   const { id } = req.params;
   try {
-    const userRole = normalizeRole(req.user.role);
-    let sql, params;
-    if (userRole === 'dytaes_admin') {
-      sql = 'UPDATE initiatives SET status = ? WHERE id = ?';
-      params = ['approved', id];
-    } else {
-      sql = 'UPDATE initiatives SET status = ? WHERE id = ? AND dytael_id = ?';
-      params = ['approved', id, req.user.dytael_id];
-    }
-    const [result] = await pool.query(sql, params);
+    const [result] = await pool.query(
+      'UPDATE initiatives SET status = ? WHERE id = ? AND dytael_id = ?',
+      ['approved', id, req.user.dytael_id]
+    );
     if (result.affectedRows === 0) {
       return res.status(403).json({ error: 'Non autorisé ou initiative introuvable.' });
     }
@@ -486,20 +487,14 @@ router.put('/:id/validate', authenticateToken, requireRole('dytael_admin'), asyn
   }
 });
 
-// ✅ PUT /api/data/:id/reject – rejeter une initiative (admin)
-router.put('/:id/reject', authenticateToken, requireRole('dytael_admin'), async (req, res) => {
+// ✅ PUT /api/data/:id/reject – rejeter (DyTAEL admin uniquement, scope DyTAEL)
+router.put('/:id/reject', authenticateToken, denyReadOnlyRoles, requireRole('dytael_admin'), async (req, res) => {
   const { id } = req.params;
   try {
-    const userRole = normalizeRole(req.user.role);
-    let sql, params;
-    if (userRole === 'dytaes_admin') {
-      sql = 'UPDATE initiatives SET status = ? WHERE id = ?';
-      params = ['rejected', id];
-    } else {
-      sql = 'UPDATE initiatives SET status = ? WHERE id = ? AND dytael_id = ?';
-      params = ['rejected', id, req.user.dytael_id];
-    }
-    const [result] = await pool.query(sql, params);
+    const [result] = await pool.query(
+      'UPDATE initiatives SET status = ? WHERE id = ? AND dytael_id = ?',
+      ['rejected', id, req.user.dytael_id]
+    );
     if (result.affectedRows === 0) {
       return res.status(403).json({ error: 'Non autorisé ou initiative introuvable.' });
     }
@@ -510,14 +505,17 @@ router.put('/:id/reject', authenticateToken, requireRole('dytael_admin'), async 
   }
 });
 
-// ✅ PUT /api/data/:id/cancel-delete – annuler une demande de suppression (admin)
-router.put('/:id/cancel-delete', authenticateToken, requireRole('dytael_admin'), async (req, res) => {
+// ✅ PUT /api/data/:id/cancel-delete – annuler une demande de suppression (DyTAEL admin)
+router.put('/:id/cancel-delete', authenticateToken, denyReadOnlyRoles, requireRole('dytael_admin'), async (req, res) => {
   const { id } = req.params;
   try {
-    await pool.query(
-      'UPDATE initiatives SET status = ? WHERE id = ? AND status = ?',
-      ['approved', id, 'delete_requested']
+    const [result] = await pool.query(
+      'UPDATE initiatives SET status = ? WHERE id = ? AND status = ? AND dytael_id = ?',
+      ['approved', id, 'delete_requested', req.user.dytael_id]
     );
+    if (result.affectedRows === 0) {
+      return res.status(403).json({ error: 'Non autorisé ou initiative introuvable.' });
+    }
     res.json({ message: 'Demande de suppression annulée.' });
   } catch (err) {
     console.error('Erreur PUT /api/data/:id/cancel-delete:', err);
@@ -553,7 +551,7 @@ router.get('/mine', authenticateToken, async (req, res) => {
 });
 
 // ✅ POST /api/data/:id/request-delete – demande de suppression
-router.post('/:id/request-delete', authenticateToken, async (req, res) => {
+router.post('/:id/request-delete', authenticateToken, denyReadOnlyRoles, async (req, res) => {
   const { id } = req.params;
   try {
     const [result] = await pool.query(
@@ -570,11 +568,50 @@ router.post('/:id/request-delete', authenticateToken, async (req, res) => {
   }
 });
 
+// Try to extract the caller from a Bearer token without forcing auth.
+// Returns null if no/invalid token (route stays open to anonymous reads).
+function tryDecodeUser(req) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader?.split(' ')[1];
+  if (!token) return null;
+  try {
+    return jwt.verify(token, SECRET);
+  } catch (_) {
+    return null;
+  }
+}
+
+// True if the caller may see initiatives regardless of status (admins
+// of the right scope, or the original submitter).
+function canViewAnyStatus(user, initiative) {
+  if (!user) return false;
+  const role = normalizeRole(user.role);
+  if (role === 'dytaes_admin') return true; // national read-only access
+  if (role === 'dytael_admin' && initiative.dytael_id === user.dytael_id) return true;
+  if (initiative.user_id === user.id) return true;
+  return false;
+}
+
 // ✅ GET /api/data/:id/children – sous-initiatives d'un programme
 router.get('/:id/children', async (req, res) => {
   const { id } = req.params;
   try {
-    const [rows] = await pool.query(`
+    const user = tryDecodeUser(req);
+
+    // Need the parent's dytael_id to authorize visibility of pending children.
+    const [parentRows] = await pool.query(
+      'SELECT id, dytael_id FROM initiatives WHERE id = ?',
+      [id]
+    );
+    if (parentRows.length === 0) {
+      return res.status(404).json({ error: 'Programme introuvable.' });
+    }
+    const parent = parentRows[0];
+
+    // Public callers (and editors who don't own the parent) only see approved children.
+    const includeAllStatuses = canViewAnyStatus(user, parent);
+
+    let sql = `
       SELECT
         id, initiative, description, village, commune, zone_intervention,
         actor_type, year, activities, lat, lon, location_type,
@@ -584,8 +621,14 @@ router.get('/:id/children', async (req, res) => {
         bailleurs, organisation, point_contact, duree
       FROM initiatives
       WHERE parent_id = ?
-      ORDER BY created_at DESC
-    `, [id]);
+    `;
+    const params = [id];
+    if (!includeAllStatuses) {
+      sql += " AND status = 'approved'";
+    }
+    sql += ' ORDER BY created_at DESC';
+
+    const [rows] = await pool.query(sql, params);
 
     const withPhotos = await attachPhotos(rows, req);
     const withLocations = await attachLocations(withPhotos);
@@ -597,6 +640,7 @@ router.get('/:id/children', async (req, res) => {
 });
 
 // ✅ GET /api/data/:id – récupérer une initiative spécifique
+// Public callers: approved seulement. Authentifiés: selon scope (admin DyTAEL/DyTAES, ou propriétaire).
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -606,13 +650,20 @@ router.get('/:id', async (req, res) => {
         actor_type, year, activities, lat, lon, location_type,
         contact_email, contact_phone, person_name,
         website, social_media, videos, extra_fields, status,
-        created_at, user_id, parent_id,
+        created_at, user_id, dytael_id, parent_id,
         bailleurs, organisation, point_contact, duree
       FROM initiatives
       WHERE id = ?
     `, [id]);
 
     if (rows.length === 0) {
+      return res.status(404).json({ error: "Initiative introuvable" });
+    }
+
+    const initiative = rows[0];
+    const user = tryDecodeUser(req);
+    if (initiative.status !== 'approved' && !canViewAnyStatus(user, initiative)) {
+      // Hide existence to anonymous / non-authorized callers.
       return res.status(404).json({ error: "Initiative introuvable" });
     }
 
@@ -628,8 +679,34 @@ router.get('/:id', async (req, res) => {
 });
 
 // ✅ PUT /api/data/:id – modifier une initiative
-router.put('/:id', authenticateToken, async (req, res) => {
+// Editor: seulement ses propres initiatives. DyTAEL admin: seulement dans son DyTAEL.
+// DyTAES bloquée par denyReadOnlyRoles (souveraineté DyTAEL).
+router.put('/:id', authenticateToken, denyReadOnlyRoles, async (req, res) => {
   const { id } = req.params;
+
+  // Authorization gate: load the target row and check ownership / DyTAEL scope.
+  try {
+    const [existingRows] = await pool.query(
+      'SELECT id, user_id, dytael_id FROM initiatives WHERE id = ?',
+      [id]
+    );
+    if (existingRows.length === 0) {
+      return res.status(404).json({ error: 'Initiative introuvable.' });
+    }
+    const existing = existingRows[0];
+    const userRole = normalizeRole(req.user.role);
+    const isDytaelAdmin = userRole === 'dytael_admin';
+    const isOwner = existing.user_id === req.user.id;
+    const sameDytael = existing.dytael_id != null && existing.dytael_id === req.user.dytael_id;
+    const allowed = (isDytaelAdmin && sameDytael) || isOwner;
+    if (!allowed) {
+      return res.status(403).json({ error: "Vous n'avez pas l'autorisation de modifier cette initiative." });
+    }
+  } catch (err) {
+    console.error('Erreur autorisation PUT /api/data/:id:', err);
+    return res.status(500).json({ error: 'Erreur serveur' });
+  }
+
   const {
     initiative,
     description,
