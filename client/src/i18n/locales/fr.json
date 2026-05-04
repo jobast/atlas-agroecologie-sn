@@ -96,6 +96,7 @@
     "create_account": "Créer un compte",
     "forgot_password": "Mot de passe oublié ?",
     "login_error": "Une erreur est survenue. Vérifiez votre connexion ou réessayez plus tard.",
+    "login_required_to_submit": "Pour soumettre une initiative, vous devez d'abord vous connecter à votre compte. Si vous n'en avez pas, vous pouvez en créer un.",
     "register_title": "Créer un compte",
     "register_button": "S'inscrire",
     "registering": "Inscription en cours…",

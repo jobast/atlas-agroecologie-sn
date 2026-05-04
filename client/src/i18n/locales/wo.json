@@ -96,6 +96,7 @@
     "create_account": "Sos ab kont",
     "forgot_password": "Fàttee nga sa baatu jàll ?",
     "login_error": "Am na njuumte. Xoolal sa internet walla jéémaatal ci kanam.",
+    "login_required_to_submit": "Ngir yónnee ab jëfkaay, war nga jëkk dugg sa kont. Su nga ko amul, man ngaa sos benn.",
     "register_title": "Sos ab kont",
     "register_button": "Bindu",
     "registering": "Di bindu…",

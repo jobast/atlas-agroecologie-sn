@@ -60,8 +60,9 @@ export default function Navbar() {
     };
   }, [location.pathname]);
 
-  const isAdmin = ['admin', 'dytael_admin', 'dytaes_admin'].includes(userRole);
-  const isDytaesAdmin = userRole === 'dytaes_admin';
+  const isAdmin = ['admin', 'dytael_admin', 'dytaes_admin', 'super_admin'].includes(userRole);
+  const isDytaesAdmin = userRole === 'dytaes_admin' || userRole === 'super_admin';
+  const isNational = slug === 'national';
 
   const p = (path) => slug ? `/${slug}${path}` : path;
 
@@ -99,7 +100,9 @@ export default function Navbar() {
     { to: p('/map'), label: t('nav.map') },
     { to: p('/table'), label: t('nav.table') },
   ];
-  const userNav = token ? [
+  // On the national (DyTAES) space, the per-user submit/edit links are hidden:
+  // contributions live inside DyTAEL spaces, not at the national level.
+  const userNav = (token && !isNational) ? [
     { to: p('/submit'), label: t('nav.submit') },
     { to: p('/my-initiatives'), label: t('nav.my_initiatives') },
   ] : [];
