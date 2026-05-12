@@ -10,6 +10,7 @@ import { GeoSearchControl, OpenStreetMapProvider } from 'leaflet-geosearch';
 import 'leaflet-geosearch/dist/geosearch.css';
 import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { useDytael } from '../context/DytaelContext';
+import { getTokenStatus } from '../utils/auth';
 
 const MAX_PHOTOS = 5;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5 Mo
@@ -111,12 +112,109 @@ export default function FormInput({ variant = 'default' }) {
   const [formErrors, setFormErrors] = useState([]);
   const errorBannerRef = useRef(null);
 
+  // Auth state + draft persistence (so a user mid-form is never left stranded
+  // when their JWT is missing/expired - their answers stay on this device).
+  const [authStatus, setAuthStatus] = useState(() => getTokenStatus());
+  const [draftRestored, setDraftRestored] = useState(false);
+  const hydratedRef = useRef(false);
+  const draftKey = `atlas:formDraft:${slug || 'default'}:${parentIdFromUrl || 'none'}`;
+
+  const clearDraft = () => {
+    try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
+    setDraftRestored(false);
+  };
+
   useEffect(() => {
     const params = currentDytael ? `?dytael_id=${currentDytael.id}` : '';
     axios.get(`${import.meta.env.VITE_API_URL}/custom-fields${params}`)
       .then(res => setCustomFields(res.data || []))
       .catch(() => setCustomFields([]));
   }, [currentDytael]);
+
+  // Restore any saved draft on mount (photos are not persisted - File objects
+  // can't be serialised - so users have to reselect images after a reload).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d.formData && typeof d.formData === 'object') {
+          setFormData(prev => ({ ...prev, ...d.formData, photos: [] }));
+        }
+        if (Array.isArray(d.locations) && d.locations.length > 0) setLocations(d.locations);
+        if (d.customValues && typeof d.customValues === 'object') setCustomValues(d.customValues);
+        if (Array.isArray(d.socialMedia)) setSocialMedia(d.socialMedia);
+        if (d.socialLinks && typeof d.socialLinks === 'object') setSocialLinks(d.socialLinks);
+        if (Array.isArray(d.videoLinks) && d.videoLinks.length > 0) setVideoLinks(d.videoLinks);
+        if (typeof d.entryType === 'string' && !parentIdFromUrl) setEntryType(d.entryType);
+        if (typeof d.sameAsDeclarant === 'boolean') setSameAsDeclarant(d.sameAsDeclarant);
+        setDraftRestored(true);
+      }
+    } catch { /* corrupt draft - ignore */ }
+    hydratedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+
+  // Save draft whenever the persisted slice changes (after initial hydration).
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const { photos: _photos, ...serializable } = formData;
+    const trim = (v) => (typeof v === 'string' ? v.trim() : v);
+    const hasUserInput =
+      trim(formData.initiative) ||
+      trim(formData.description) ||
+      trim(formData.village) ||
+      trim(formData.commune) ||
+      trim(formData.actor_type) ||
+      trim(formData.year) ||
+      trim(formData.contact_email) ||
+      trim(formData.contact_phone) ||
+      trim(formData.person_name) ||
+      trim(formData.website) ||
+      (Array.isArray(formData.activities) && formData.activities.length > 0) ||
+      (Array.isArray(formData.videos) && formData.videos.some(v => trim(v))) ||
+      (locations || []).some(loc => trim(loc.label) || trim(loc.village) || trim(loc.commune) || trim(loc.lat) || trim(loc.lon)) ||
+      Object.values(customValues || {}).some(v => trim(v)) ||
+      (socialMedia || []).length > 0;
+    if (!hasUserInput) {
+      // Nothing worth saving - clear any stale draft so the restored banner
+      // doesn't show next time on a clean form.
+      try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
+      return;
+    }
+    const payload = {
+      formData: serializable,
+      locations,
+      customValues,
+      socialMedia,
+      socialLinks,
+      videoLinks,
+      entryType,
+      sameAsDeclarant,
+    };
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(payload));
+    } catch { /* quota or unavailable - ignore */ }
+  }, [formData, locations, customValues, socialMedia, socialLinks, videoLinks, entryType, sameAsDeclarant, draftKey]);
+
+  // Re-evaluate token freshness on mount, window focus, and cross-tab changes
+  // (e.g. user logged in via another tab - banner should disappear).
+  useEffect(() => {
+    const recheck = () => setAuthStatus(getTokenStatus());
+    recheck();
+    const onFocus = () => recheck();
+    const onStorage = (e) => { if (!e || e.key === 'token') recheck(); };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  const goToLogin = () => {
+    navigate('/login', { state: { reason: 'submit-initiative' } });
+  };
 
   // Load parent programme name when parent_id is in URL
   useEffect(() => {
@@ -127,6 +225,12 @@ export default function FormInput({ variant = 'default' }) {
   }, [parentIdFromUrl]);
 
   const handleChange = (e) => {
+    // Cheap re-check on each interaction so an expiring token surfaces a
+    // banner before the user wastes time filling out the rest of the form.
+    if (authStatus === 'valid') {
+      const fresh = getTokenStatus();
+      if (fresh !== 'valid') setAuthStatus(fresh);
+    }
     const { name, value, type, files } = e.target;
     if (type === 'file') {
       const picked = Array.from(files || []);
@@ -418,6 +522,8 @@ export default function FormInput({ variant = 'default' }) {
 
     const createdId = response.data?.id;
 
+    clearDraft();
+
     // If creating a programme, redirect to programme view
     if (entryType === 'programme' && createdId) {
       alert(t('form.programme_saved'));
@@ -472,6 +578,8 @@ export default function FormInput({ variant = 'default' }) {
       message = serverMsg;
     } else if (status === 401 || status === 403) {
       message = t('form.validation.session_expired');
+      // Surface the banner too so the login CTA is visible alongside the error.
+      setAuthStatus(getTokenStatus() === 'missing' ? 'missing' : 'expired');
     } else if (status >= 500) {
       message = t('form.validation.server_error');
     } else if (!error.response && error.message && error.message !== 'Network Error') {
@@ -553,6 +661,63 @@ export default function FormInput({ variant = 'default' }) {
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Auth-required banner: shown when no token or expired token, so the
+            user is warned BEFORE filling 10 minutes of fields and at submit time. */}
+        {authStatus !== 'valid' && (
+          <div
+            role="status"
+            className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4"
+          >
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 9v4"/>
+                <path d="M12 17h.01"/>
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              </svg>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-amber-900 mb-1">
+                  {t('form.auth_required_title')}
+                </div>
+                <div className="text-sm text-amber-800">
+                  {authStatus === 'expired'
+                    ? t('form.auth_required_expired')
+                    : t('form.auth_required_missing')}
+                </div>
+                <button
+                  type="button"
+                  onClick={goToLogin}
+                  className="mt-3 inline-flex items-center px-3 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors"
+                >
+                  {t('form.auth_login_now')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Draft restored notice */}
+        {draftRestored && (
+          <div
+            role="status"
+            className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3 flex items-start gap-3"
+          >
+            <svg className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12a9 9 0 1 1-3-6.7"/>
+              <polyline points="21 4 21 10 15 10"/>
+            </svg>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-emerald-800">{t('form.draft_restored')}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => { clearDraft(); window.location.reload(); }}
+              className="shrink-0 text-xs text-emerald-700 hover:text-emerald-900 underline"
+            >
+              {t('form.draft_clear')}
+            </button>
           </div>
         )}
 

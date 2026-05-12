@@ -271,6 +271,12 @@
     "token_missing": "Amul token. War nga dugg.",
     "mobile_version": "Version telefon",
     "mobile_desc": "Fiirnde ci wàllu liggéey bi (menm bërëb yi ci wéb bi).",
+    "auth_required_title": "Dugg laay laaj ngir yónnee",
+    "auth_required_missing": "Duggoo. Mën nga tàmbali def fiirnde bi : sa tontu yi ñu denc nañu leen ci appareil bii, te ñu laaj la nga dugg ngir yónnee leen.",
+    "auth_required_expired": "Sa session jeex na. Sa tontu yi denc nañu leen ci appareil bii. Dugg ngir mën a yónnee fiirnde bi.",
+    "auth_login_now": "Dugg",
+    "draft_restored": "Brouillon bi delloo na : delloo nañu sa tontu yi mu jiitu ci appareil bii.",
+    "draft_clear": "Faatu brouillon bi",
     "validation": {
       "title": "Sukkandikul bërëb yi war:",
       "year_invalid": "At bi war na nekk lim ci diggante 1900 ak {{max}}.",

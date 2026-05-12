@@ -271,6 +271,12 @@
     "token_missing": "Token manquant. Vous devez être connecté.",
     "mobile_version": "Version mobile",
     "mobile_desc": "Formulaire optimisé pour le terrain (mêmes champs que la version web).",
+    "auth_required_title": "Connexion requise pour soumettre",
+    "auth_required_missing": "Vous n'êtes pas connecté. Vous pouvez commencer à remplir le formulaire : vos réponses seront conservées sur cet appareil, et il vous sera demandé de vous connecter pour les envoyer.",
+    "auth_required_expired": "Votre session a expiré. Vos réponses sont conservées sur cet appareil. Connectez-vous pour pouvoir envoyer le formulaire.",
+    "auth_login_now": "Se connecter",
+    "draft_restored": "Brouillon restauré : nous avons récupéré vos réponses précédentes sur cet appareil.",
+    "draft_clear": "Vider le brouillon",
     "validation": {
       "title": "Veuillez compléter les champs obligatoires :",
       "year_invalid": "L'année doit être un nombre entre 1900 et {{max}}.",
