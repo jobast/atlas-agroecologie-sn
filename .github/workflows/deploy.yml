@@ -1,0 +1,73 @@
+name: Deploy to Infomaniak
+
+on:
+  push:
+    branches: [deploy-infomaniak]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-infomaniak
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.INFOMANIAK_SSH_HOST }}
+          username: ${{ secrets.INFOMANIAK_SSH_USER }}
+          key: ${{ secrets.INFOMANIAK_SSH_KEY }}
+          port: ${{ secrets.INFOMANIAK_SSH_PORT || 22 }}
+          command_timeout: 12m
+          script: |
+            set -e
+            SITE_DIR=/srv/customer/sites/atlas.creates.ngo
+            cd "$SITE_DIR"
+
+            echo "=== Pulling deploy-infomaniak ==="
+            # Stash any prod-only changes (e.g. server/.env.production) so the pull is clean.
+            if ! git diff --quiet || ! git diff --cached --quiet; then
+              git stash push -u -m "ci-deploy auto-stash $(date -u +%FT%TZ)" || true
+            fi
+            git fetch --prune
+            git checkout deploy-infomaniak
+            git pull --ff-only origin deploy-infomaniak
+
+            # Restore server/.env.production from the most recent stash if it was stashed.
+            if git stash list | grep -q "ci-deploy auto-stash"; then
+              git checkout "stash@{0}" -- server/.env.production 2>/dev/null || true
+            fi
+
+            echo "=== Building client ==="
+            cd "$SITE_DIR/client"
+            npm install --no-audit --no-fund
+            npm run build
+            test -f dist/index.html
+
+            echo "=== Deploying static assets to site root ==="
+            cd "$SITE_DIR"
+            cp -r client/dist/* .
+
+            echo "=== Restarting Node backend ==="
+            # Passenger-style restart hook (no-op if hosting doesn't use it).
+            mkdir -p tmp
+            touch tmp/restart.txt
+            # Fallback: kill any lingering node process for this app and relaunch under nohup.
+            OLD_PIDS=$(ps aux | grep "[n]ode .*server/index.js" | awk '{print $2}' || true)
+            if [ -n "$OLD_PIDS" ]; then
+              echo "Killing old node PIDs: $OLD_PIDS"
+              kill $OLD_PIDS || true
+              sleep 2
+              # Force-kill any that didn't exit.
+              REMAINING=$(ps aux | grep "[n]ode .*server/index.js" | awk '{print $2}' || true)
+              [ -n "$REMAINING" ] && kill -9 $REMAINING || true
+            fi
+            cd "$SITE_DIR/server"
+            NODE_ENV=production nohup node index.js > "$SITE_DIR/tmp/server.log" 2>&1 &
+            disown || true
+            sleep 3
+            echo "=== Deploy finished ==="
+            ps aux | grep "[n]ode .*server/index.js" || echo "(server not detected via ps - if Infomaniak's process manager owns the lifecycle, click 'Launch' in the panel)"
