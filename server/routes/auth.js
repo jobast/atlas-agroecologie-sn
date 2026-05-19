@@ -129,7 +129,9 @@ router.post('/login', async (req, res) => {
     await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [u.id]);
 
     // Include dytael_id in JWT
-    const token = jwt.sign({ id: u.id, role: u.role, dytael_id: u.dytael_id || null }, SECRET, { expiresIn: '7d' });
+    // 24-hour JWT - active users get a fresh one automatically via the
+    // sliding-refresh header in authMiddleware, so 1 day is comfortable.
+    const token = jwt.sign({ id: u.id, role: u.role, dytael_id: u.dytael_id || null }, SECRET, { expiresIn: '1d' });
 
     // Fetch DyTAEL slug for redirect
     let dytael_slug = null;

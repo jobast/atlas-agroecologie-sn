@@ -29,6 +29,12 @@ function isSuperAdmin(role) {
   return normalizeRole(role) === 'super_admin';
 }
 
+// 12-hour sliding window. When the verified token is older than this, we
+// mint a fresh 1-day JWT and surface it via X-Refreshed-Token; the axios
+// interceptor on the client swaps it into localStorage transparently.
+const SLIDING_REFRESH_AFTER_S = 12 * 60 * 60;
+const JWT_TTL = '1d';
+
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader?.split(' ')[1];
@@ -36,8 +42,22 @@ function authenticateToken(req, res, next) {
   if (!token) return res.sendStatus(401);
 
   jwt.verify(token, SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user; // { id, role, dytael_id }
+    // 401 (not 403) for an invalid/expired token — the client interceptor
+    // treats 401 as "session expired, log the user out".
+    if (err) return res.sendStatus(401);
+    req.user = user; // { id, role, dytael_id, iat, exp }
+
+    const nowS = Math.floor(Date.now() / 1000);
+    if (user.iat && (nowS - user.iat) > SLIDING_REFRESH_AFTER_S) {
+      try {
+        const refreshed = jwt.sign(
+          { id: user.id, role: user.role, dytael_id: user.dytael_id || null },
+          SECRET,
+          { expiresIn: JWT_TTL }
+        );
+        res.setHeader('X-Refreshed-Token', refreshed);
+      } catch (_) { /* best-effort; old token still valid for the request */ }
+    }
     next();
   });
 }

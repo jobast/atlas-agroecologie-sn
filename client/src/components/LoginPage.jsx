@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 export default function LoginPage() {
@@ -10,10 +10,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { t } = useTranslation();
   // Reason banner — shown when the user was redirected here from a gated
   // action (e.g. clicking "Add initiative" without a session).
   const redirectReason = location.state?.reason || null;
+  const sessionExpired = searchParams.get('session_expired') === '1';
+  const returnTo = searchParams.get('from') || null;
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -35,7 +38,9 @@ export default function LoginPage() {
         const role = user.role === 'admin' ? 'dytael_admin' : user.role;
         const slug = user.dytael_slug || 'national';
 
-        if (role === 'super_admin' || role === 'dytaes_admin') {
+        if (returnTo) {
+          navigate(returnTo);
+        } else if (role === 'super_admin' || role === 'dytaes_admin') {
           navigate('/national/admin');
         } else if (['dytael_admin', 'admin'].includes(user.role)) {
           navigate(`/${slug}/admin`);
@@ -61,6 +66,11 @@ export default function LoginPage() {
         {redirectReason === 'submit-initiative' && (
           <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             {t('auth.login_required_to_submit')}
+          </div>
+        )}
+        {sessionExpired && (
+          <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {t('auth.session_expired_banner', { defaultValue: 'Votre session a expiré. Reconnectez-vous pour continuer — vous serez redirigé vers la page d\'origine.' })}
           </div>
         )}
         <form onSubmit={handleLogin} className="space-y-4">

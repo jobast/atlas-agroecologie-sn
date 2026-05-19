@@ -30,6 +30,8 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+  // Allow the SPA to read the sliding-refresh header from cross-origin responses.
+  res.setHeader('Access-Control-Expose-Headers', 'X-Refreshed-Token');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
