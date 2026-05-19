@@ -127,7 +127,11 @@ async function attachLocations(rows) {
 }
 
 // ✅ POST /api/data – Créer une nouvelle initiative
-router.post('/', authenticateToken, denyReadOnlyRoles, upload.array('photos', 5), async (req, res) => {
+// Anyone logged in can submit (including dytaes_admin) - the local DyTAEL
+// admin of the target territory then validates or rejects. Mutations on
+// existing initiatives (edit/validate/reject/delete) stay gated by
+// denyReadOnlyRoles on their own routes.
+router.post('/', authenticateToken, upload.array('photos', 5), async (req, res) => {
   console.log('POST /api/data — user:', req.user?.id, 'files:', req.files?.length || 0);
 
   const {
@@ -280,13 +284,23 @@ router.post('/', authenticateToken, denyReadOnlyRoles, upload.array('photos', 5)
       return res.status(403).json({ error: 'Utilisateur inconnu.' });
     }
 
-    // dytael_id: a sub-initiative inherits its parent's DyTAEL (canonical source),
-    // otherwise it falls back to the submitter's DyTAEL. super_admin can override
-    // explicitly via body.dytael_id; everyone else is locked to their own DyTAEL.
-    let dytaelId = parentDytaelId != null ? parentDytaelId : (req.user.dytael_id || null);
-    if (isSuperAdmin(req.user.role) && req.body.dytael_id) {
-      const overrideDytael = parseInt(req.body.dytael_id);
-      if (!Number.isNaN(overrideDytael)) dytaelId = overrideDytael;
+    // dytael_id: a sub-initiative inherits its parent's DyTAEL (canonical source).
+    // Otherwise the submission lands in the DyTAEL of the page the user came
+    // from (sent as body.dytael_id by the client), falling back to the user's
+    // own DyTAEL if none was provided. The target DyTAEL admin validates.
+    let dytaelId = parentDytaelId;
+    if (dytaelId == null) {
+      const bodyDytael = parseInt(req.body.dytael_id, 10);
+      if (!Number.isNaN(bodyDytael)) {
+        const [dRows] = await conn.query('SELECT id FROM dytaels WHERE id = ?', [bodyDytael]);
+        if (dRows.length === 0) {
+          await conn.rollback();
+          return res.status(400).json({ error: 'DyTAEL cible introuvable.' });
+        }
+        dytaelId = bodyDytael;
+      } else {
+        dytaelId = req.user.dytael_id || null;
+      }
     }
 
     // Determine effective location_type

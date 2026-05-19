@@ -505,6 +505,12 @@ export default function FormInput({ variant = 'default' }) {
     data.append('parent_id', parentIdFromUrl);
   }
 
+  // Tell the server which DyTAEL this submission belongs to (the page's slug,
+  // not the user's home DyTAEL) so it lands in the right validation queue.
+  if (currentDytael?.id) {
+    data.append('dytael_id', currentDytael.id);
+  }
+
   // Force location_type to 'zone' for programmes (no GPS)
   if (entryType === 'programme') {
     data.set('location_type', 'zone');
