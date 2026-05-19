@@ -81,6 +81,23 @@ async function sendConfirmationEmail(email, token) {
   }
 }
 
+async function sendInvitationEmail({ email, token, dytaelName, inviterEmail }) {
+  const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const inviteUrl = `${frontendBase}/reset-password/${token}`;
+  const scope = dytaelName ? ` en tant qu'administrateur du DyTAEL ${dytaelName}` : '';
+  const byWhom = inviterEmail ? ` par ${inviterEmail}` : '';
+  try {
+    await t.sendMail({
+      from: `GeoCollect <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Vous avez été invité sur l'Atlas Agroécologie",
+      text: `Vous avez été invité${byWhom} à rejoindre l'Atlas Agroécologie${scope}.\n\nPour créer votre mot de passe et accéder à la plateforme, cliquez sur ce lien :\n${inviteUrl}\n\nCe lien est valable 7 jours. Passé ce délai, demandez à l'administrateur de vous renvoyer une invitation.`
+    });
+  } catch (e) {
+    console.error("❌ Erreur d'envoi d'invitation :", e);
+  }
+}
+
 async function sendResetEmail(email, token) {
   const frontendBase = process.env.FRONTEND_URL || 'http://localhost:5173';
   const resetUrl = `${frontendBase}/reset-password/${token}`;
@@ -99,5 +116,6 @@ async function sendResetEmail(email, token) {
 module.exports = {
   sendNewSubmissionAlert,
   sendConfirmationEmail,
-  sendResetEmail
+  sendResetEmail,
+  sendInvitationEmail
 };

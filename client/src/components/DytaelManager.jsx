@@ -15,6 +15,8 @@ export default function DytaelManager() {
     bounds_sw_lat: '', bounds_sw_lon: '', bounds_ne_lat: '', bounds_ne_lon: '',
     default_zoom: 10, active: true, admin_user_ids: []
   });
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteBusy, setInviteBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('info');
   const token = localStorage.getItem('token');
@@ -48,6 +50,33 @@ export default function DytaelManager() {
       if (set.has(userId)) set.delete(userId); else set.add(userId);
       return { ...prev, admin_user_ids: [...set] };
     });
+  };
+
+  const handleInvite = async () => {
+    const email = inviteEmail.trim();
+    if (!email) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showMessage(t('dytael_manager.invite_invalid_email', { defaultValue: 'Email invalide.' }), 'error');
+      return;
+    }
+    setInviteBusy(true);
+    try {
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_URL}/users/invite`,
+        { email, dytael_id: editing || null, role: 'dytael_admin' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const newUser = res.data;
+      setUsers(prev => [newUser, ...prev]);
+      setForm(prev => ({ ...prev, admin_user_ids: [...new Set([...(prev.admin_user_ids || []), newUser.id])] }));
+      setInviteEmail('');
+      showMessage(t('dytael_manager.invite_sent', { email, defaultValue: 'Invitation envoyée à {{email}}.' }));
+    } catch (err) {
+      const msg = err.response?.data?.message || t('dytael_manager.invite_error', { defaultValue: "Échec de l'invitation." });
+      showMessage(msg, 'error');
+    } finally {
+      setInviteBusy(false);
+    }
   };
 
   const filteredUsers = users.filter(u => {
@@ -213,6 +242,29 @@ export default function DytaelManager() {
               onChange={e => setUserQuery(e.target.value)}
               className={inputClasses + ' mb-2'}
             />
+
+            {/* Invite a user who isn't yet on the platform */}
+            <div className="flex gap-2 mb-3">
+              <input
+                type="email"
+                placeholder={t('dytael_manager.invite_placeholder', { defaultValue: 'Inviter par email (nouvel admin)…' })}
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleInvite(); } }}
+                disabled={inviteBusy}
+                className={inputClasses}
+              />
+              <button
+                type="button"
+                onClick={handleInvite}
+                disabled={inviteBusy || !inviteEmail.trim()}
+                className="shrink-0 inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+              >
+                {inviteBusy
+                  ? t('dytael_manager.invite_sending', { defaultValue: 'Envoi…' })
+                  : t('dytael_manager.invite_button', { defaultValue: 'Inviter' })}
+              </button>
+            </div>
             <div className="border border-gray-200 rounded-lg bg-white max-h-64 overflow-y-auto divide-y divide-gray-100">
               {filteredUsers.length === 0 ? (
                 <div className="px-4 py-3 text-sm text-gray-400">
@@ -236,7 +288,14 @@ export default function DytaelManager() {
                         className="w-4 h-4 accent-emerald-600"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm text-gray-800 truncate">{label}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-800 truncate">{label}</span>
+                          {u.confirmed === 0 && (
+                            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                              {t('dytael_manager.invite_pending_badge', { defaultValue: 'Invitation en attente' })}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-gray-400 truncate">
                           {u.email}
                           {u.dytael_name ? ` · ${u.dytael_name}` : ''}

@@ -206,7 +206,10 @@ router.post('/reset/:token', async (req, res) => {
       return res.status(400).json({ message: 'Ce lien a déjà été utilisé.' });
     }
     const hash = await bcrypt.hash(password, 10);
-    await pool.query('UPDATE users SET password = ? WHERE id = ?', [hash, decoded.id]);
+    // Setting the password also confirms the account: the user just proved
+    // ownership of the email by clicking the link (covers the invite flow,
+    // and is harmless for a normal password reset on an already-confirmed user).
+    await pool.query('UPDATE users SET password = ?, confirmed = 1 WHERE id = ?', [hash, decoded.id]);
     res.json({ message: 'Mot de passe mis à jour' });
   } catch (err) {
     console.error('Erreur /reset :', err);
