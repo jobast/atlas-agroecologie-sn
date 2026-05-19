@@ -9,7 +9,7 @@ export default function AdminRoute({ children }) {
     return <Navigate to="/login" />;
   }
 
-  const adminRoles = ['admin', 'dytael_admin', 'dytaes_admin'];
+  const adminRoles = ['admin', 'dytael_admin', 'dytaes_admin', 'super_admin'];
   if (!adminRoles.includes(user.role)) {
     return <Navigate to="/login" />;
   }

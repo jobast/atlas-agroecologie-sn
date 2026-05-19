@@ -10,7 +10,8 @@ export default function DytaesRoute({ children }) {
   }
 
   const role = user.role === 'admin' ? 'dytael_admin' : user.role;
-  if (role !== 'dytaes_admin') {
+  // super_admin has DyTAES powers and above, so it passes through too.
+  if (!['dytaes_admin', 'super_admin'].includes(role)) {
     return <Navigate to="/" />;
   }
 

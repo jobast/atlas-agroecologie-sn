@@ -35,7 +35,7 @@ export default function LoginPage() {
         const role = user.role === 'admin' ? 'dytael_admin' : user.role;
         const slug = user.dytael_slug || 'national';
 
-        if (role === 'dytaes_admin') {
+        if (role === 'super_admin' || role === 'dytaes_admin') {
           navigate('/national/admin');
         } else if (['dytael_admin', 'admin'].includes(user.role)) {
           navigate(`/${slug}/admin`);

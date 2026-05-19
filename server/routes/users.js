@@ -3,7 +3,7 @@ const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { authenticateToken, requireRole, normalizeRole } = require('../middleware/authMiddleware');
+const { authenticateToken, requireRole, normalizeRole, hasRole } = require('../middleware/authMiddleware');
 const router = express.Router();
 
 const RESET_SECRET = process.env.JWT_RESET_SECRET || process.env.JWT_SECRET || 'supersecretkey';
@@ -19,7 +19,7 @@ router.get('/', authenticateToken, requireRole('dytael_admin'), async (req, res)
     `;
     const params = [];
 
-    if (userRole !== 'dytaes_admin' && req.user.dytael_id) {
+    if (!hasRole(userRole, 'dytaes_admin') && req.user.dytael_id) {
       sql += ' WHERE u.dytael_id = ?';
       params.push(req.user.dytael_id);
     }
@@ -125,24 +125,23 @@ router.put('/:id', authenticateToken, requireRole('dytael_admin'), async (req, r
   const userRole = normalizeRole(req.user.role);
 
   try {
-    // dytael_admin cannot change dytael_id or promote to dytaes_admin
-    if (userRole !== 'dytaes_admin') {
-      if (role === 'dytaes_admin') {
-        return res.status(403).json({ message: 'Vous ne pouvez pas promouvoir au rôle dytaes_admin.' });
+    // dytaes_admin and super_admin have unrestricted access; lower roles
+    // can only touch users in their own DyTAEL and can't grant higher roles.
+    const isHighLevel = hasRole(userRole, 'dytaes_admin');
+    if (!isHighLevel) {
+      if (['dytaes_admin', 'super_admin'].includes(role)) {
+        return res.status(403).json({ message: 'Vous ne pouvez pas promouvoir à ce rôle.' });
       }
-      // Verify target user belongs to same DyTAEL
       const [targetRows] = await pool.query('SELECT dytael_id FROM users WHERE id = ?', [req.params.id]);
       if (targetRows.length === 0) return res.sendStatus(404);
       if (targetRows[0].dytael_id !== req.user.dytael_id) {
         return res.status(403).json({ message: 'Accès interdit à cet utilisateur.' });
       }
-      // dytael_admin cannot change dytael_id
       await pool.query(
         'UPDATE users SET role = ?, name = ?, surname = ?, phone = ?, email = ?, organization = ? WHERE id = ?',
         [role, name, surname, phone, email, organization, req.params.id]
       );
     } else {
-      // dytaes_admin can update everything including dytael_id
       await pool.query(
         'UPDATE users SET role = ?, name = ?, surname = ?, phone = ?, email = ?, organization = ?, dytael_id = ? WHERE id = ?',
         [role, name, surname, phone, email, organization, dytael_id || null, req.params.id]
@@ -161,7 +160,7 @@ router.patch('/:id/confirm', authenticateToken, requireRole('dytael_admin'), asy
     const { id } = req.params;
     const userRole = normalizeRole(req.user.role);
     // Verify DyTAEL ownership for dytael_admin
-    if (userRole !== 'dytaes_admin' && req.user.dytael_id) {
+    if (!hasRole(userRole, 'dytaes_admin') && req.user.dytael_id) {
       const [targetRows] = await pool.query('SELECT dytael_id FROM users WHERE id = ?', [id]);
       if (targetRows.length === 0) return res.sendStatus(404);
       if (targetRows[0].dytael_id !== req.user.dytael_id) {
@@ -182,7 +181,7 @@ router.delete('/:id', authenticateToken, requireRole('dytael_admin'), async (req
     const { id } = req.params;
     const userRole = normalizeRole(req.user.role);
     // Verify DyTAEL ownership for dytael_admin
-    if (userRole !== 'dytaes_admin' && req.user.dytael_id) {
+    if (!hasRole(userRole, 'dytaes_admin') && req.user.dytael_id) {
       const [targetRows] = await pool.query('SELECT dytael_id FROM users WHERE id = ?', [id]);
       if (targetRows.length === 0) return res.sendStatus(404);
       if (targetRows[0].dytael_id !== req.user.dytael_id) {

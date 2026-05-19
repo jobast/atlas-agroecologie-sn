@@ -15,7 +15,7 @@ export default function EditInitiative() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
-      if (!['admin', 'dytael_admin', 'dytaes_admin'].includes(parsedUser.role)) {
+      if (!['admin', 'dytael_admin', 'dytaes_admin', 'super_admin'].includes(parsedUser.role)) {
         setUnauthorized(true);
       }
     } else {

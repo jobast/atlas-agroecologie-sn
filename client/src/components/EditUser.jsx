@@ -7,7 +7,7 @@ const inputClasses = 'w-full border border-gray-200 rounded-lg bg-gray-100 px-4 
 export default function EditUser({ user, onUpdated }) {
   const { t } = useTranslation();
   const currentUser = JSON.parse(localStorage.getItem('user'));
-  const adminRoles = ['admin', 'dytael_admin', 'dytaes_admin'];
+  const adminRoles = ['admin', 'dytael_admin', 'dytaes_admin', 'super_admin'];
   if (!currentUser || !adminRoles.includes(currentUser.role)) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm">
@@ -74,7 +74,8 @@ export default function EditUser({ user, onUpdated }) {
           <select name="role" value={form.role} onChange={handleChange} className={inputClasses}>
             <option value="editor">{t('users.role_editor')}</option>
             <option value="dytael_admin">{t('users.role_dytael_admin')}</option>
-            {currentUser.role === 'dytaes_admin' && <option value="dytaes_admin">{t('users.role_dytaes_admin')}</option>}
+            {['dytaes_admin', 'super_admin'].includes(currentUser.role) && <option value="dytaes_admin">{t('users.role_dytaes_admin')}</option>}
+            {currentUser.role === 'super_admin' && <option value="super_admin">Super admin</option>}
           </select>
         </div>
         <div className="flex items-end pb-1">
