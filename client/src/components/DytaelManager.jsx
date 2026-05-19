@@ -7,11 +7,13 @@ const inputClasses = 'w-full border border-gray-200 rounded-lg bg-gray-100 px-4 
 export default function DytaelManager() {
   const { t } = useTranslation();
   const [dytaels, setDytaels] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [userQuery, setUserQuery] = useState('');
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
     name: '', slug: '', description: '',
     bounds_sw_lat: '', bounds_sw_lon: '', bounds_ne_lat: '', bounds_ne_lon: '',
-    default_zoom: 10, active: true
+    default_zoom: 10, active: true, admin_user_ids: []
   });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('info');
@@ -26,7 +28,37 @@ export default function DytaelManager() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  const loadUsers = async () => {
+    try {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUsers(res.data || []);
+    } catch (err) {
+      // Non-admin role hitting this page would 403 - leave users empty silently.
+      console.error('Erreur chargement utilisateurs:', err);
+    }
+  };
+
+  useEffect(() => { load(); loadUsers(); }, []);
+
+  const toggleAdmin = (userId) => {
+    setForm(prev => {
+      const set = new Set(prev.admin_user_ids || []);
+      if (set.has(userId)) set.delete(userId); else set.add(userId);
+      return { ...prev, admin_user_ids: [...set] };
+    });
+  };
+
+  const filteredUsers = users.filter(u => {
+    if (!userQuery.trim()) return true;
+    const q = userQuery.toLowerCase();
+    return (
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.name || '').toLowerCase().includes(q) ||
+      (u.surname || '').toLowerCase().includes(q)
+    );
+  });
 
   const showMessage = (msg, type = 'info') => {
     setMessage(msg);
@@ -35,7 +67,8 @@ export default function DytaelManager() {
   };
 
   const resetForm = () => {
-    setForm({ name: '', slug: '', description: '', bounds_sw_lat: '', bounds_sw_lon: '', bounds_ne_lat: '', bounds_ne_lon: '', default_zoom: 10, active: true });
+    setForm({ name: '', slug: '', description: '', bounds_sw_lat: '', bounds_sw_lon: '', bounds_ne_lat: '', bounds_ne_lon: '', default_zoom: 10, active: true, admin_user_ids: [] });
+    setUserQuery('');
     setEditing(null);
   };
 
@@ -74,8 +107,10 @@ export default function DytaelManager() {
       bounds_ne_lat: d.bounds_ne_lat,
       bounds_ne_lon: d.bounds_ne_lon,
       default_zoom: d.default_zoom || 10,
-      active: d.active !== false
+      active: d.active !== false,
+      admin_user_ids: Array.isArray(d.admin_user_ids) ? d.admin_user_ids : []
     });
+    setUserQuery('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -161,6 +196,68 @@ export default function DytaelManager() {
             </div>
           </div>
 
+          {/* Admin assignment */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              {t('dytael_manager.admins_label', { defaultValue: 'Administrateurs de ce DyTAEL' })}
+            </label>
+            <p className="text-xs text-gray-500 mb-2">
+              {t('dytael_manager.admins_help', {
+                defaultValue: "Cochez les utilisateurs qui pourront valider/rejeter les initiatives de ce DyTAEL. Ils recevront aussi un email à chaque nouvelle soumission."
+              })}
+            </p>
+            <input
+              type="text"
+              placeholder={t('dytael_manager.admins_search', { defaultValue: 'Rechercher un utilisateur (nom, email)…' })}
+              value={userQuery}
+              onChange={e => setUserQuery(e.target.value)}
+              className={inputClasses + ' mb-2'}
+            />
+            <div className="border border-gray-200 rounded-lg bg-white max-h-64 overflow-y-auto divide-y divide-gray-100">
+              {filteredUsers.length === 0 ? (
+                <div className="px-4 py-3 text-sm text-gray-400">
+                  {users.length === 0
+                    ? t('dytael_manager.admins_no_users', { defaultValue: 'Aucun utilisateur disponible.' })
+                    : t('dytael_manager.admins_no_match', { defaultValue: 'Aucun résultat.' })}
+                </div>
+              ) : (
+                filteredUsers.map(u => {
+                  const checked = form.admin_user_ids.includes(u.id);
+                  const label = [u.name, u.surname].filter(Boolean).join(' ').trim() || u.email;
+                  return (
+                    <label
+                      key={u.id}
+                      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-emerald-50/40 ${checked ? 'bg-emerald-50/60' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleAdmin(u.id)}
+                        className="w-4 h-4 accent-emerald-600"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-gray-800 truncate">{label}</div>
+                        <div className="text-xs text-gray-400 truncate">
+                          {u.email}
+                          {u.dytael_name ? ` · ${u.dytael_name}` : ''}
+                          {u.role ? ` · ${u.role}` : ''}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+            {form.admin_user_ids.length > 0 && (
+              <p className="text-xs text-gray-500 mt-2">
+                {t('dytael_manager.admins_selected_count', {
+                  count: form.admin_user_ids.length,
+                  defaultValue: '{{count}} admin(s) sélectionné(s)'
+                })}
+              </p>
+            )}
+          </div>
+
           <div className="flex gap-2 pt-2">
             <button onClick={handleSave} className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">
               {editing ? (
@@ -208,6 +305,14 @@ export default function DytaelManager() {
                   <div className="text-xs text-gray-400 mt-1">
                     Bounds: [{d.bounds_sw_lat}, {d.bounds_sw_lon}] → [{d.bounds_ne_lat}, {d.bounds_ne_lon}] · Zoom: {d.default_zoom}
                   </div>
+                  {Array.isArray(d.admin_user_ids) && d.admin_user_ids.length > 0 && (
+                    <div className="text-xs text-emerald-700 mt-1">
+                      {t('dytael_manager.admins_inline', {
+                        count: d.admin_user_ids.length,
+                        defaultValue: '{{count}} administrateur(s)'
+                      })}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button

@@ -12,23 +12,29 @@ const t = nodemailer.createTransport({
 });
 
 // Resolve recipients for a new-submission alert.
-// Returns the list of dytael_admin emails for the initiative's DyTAEL,
-// falling back to ADMIN_EMAIL when none are configured (e.g. fresh DyTAEL).
+// Always CCs every confirmed super_admin (platform-wide oversight), plus the
+// dytael_admins of the target DyTAEL. Falls back to ADMIN_EMAIL only if both
+// lookups come back empty (e.g. bootstrap, fresh DyTAEL with no admins yet).
 async function resolveSubmissionRecipients(dytaelId) {
   const fallback = process.env.ADMIN_EMAIL ? [process.env.ADMIN_EMAIL] : [];
-  if (!dytaelId) return fallback;
+  const recipients = new Set();
   try {
-    const [rows] = await pool.query(
-      `SELECT email FROM users
-       WHERE dytael_id = ? AND role IN ('dytael_admin', 'admin') AND confirmed = 1`,
-      [dytaelId]
+    const [superRows] = await pool.query(
+      `SELECT email FROM users WHERE role = 'super_admin' AND confirmed = 1`
     );
-    const emails = rows.map(r => r.email).filter(Boolean);
-    return emails.length > 0 ? emails : fallback;
+    superRows.forEach(r => r.email && recipients.add(r.email));
+    if (dytaelId) {
+      const [rows] = await pool.query(
+        `SELECT email FROM users
+         WHERE dytael_id = ? AND role IN ('dytael_admin', 'admin') AND confirmed = 1`,
+        [dytaelId]
+      );
+      rows.forEach(r => r.email && recipients.add(r.email));
+    }
   } catch (e) {
     console.error('resolveSubmissionRecipients lookup failed:', e);
-    return fallback;
   }
+  return recipients.size > 0 ? [...recipients] : fallback;
 }
 
 // initiative: { name, dytaelId, dytaelName }
