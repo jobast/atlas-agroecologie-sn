@@ -40,7 +40,82 @@
     "error_generic": "Am na njuumte.",
     "submit_error": "Njuumte ci yónnee bi",
     "access_denied_admin": "Ci administrateur yi rekk.",
-    "load_error": "Njuumte ci yébbale bi"
+    "load_error": "Njuumte ci yébbale bi",
+    "next": "Topp"
+  },
+  "offline": {
+    "banner": "Nekkoo ci ligne. Sa soppi yi ñu dina yónnee leen su konekk bi delsi.",
+    "savedLocally": "Jëfkaay bi denc na ci appareil bi. Mu ngi yónnee bu mu ko menee.",
+    "enqueueError": "Mënuñu denc ci appareil bi (storage feesul ?).",
+    "pendingBadge": "{{count}} ci xaar",
+    "pendingBadgeTitle": "Envois yi ci xaar",
+    "pendingTitle": "Sama envois yi ci xaar",
+    "pendingHelp": "Jëfkaay yii ñungi denc ci sa appareil te dañu leen yónnee su konekk delsi. Mën ngaa yónnee leen ci sa loxo walla ñakk leen.",
+    "empty": "Amul envois bu xaar. Lépp wér na.",
+    "retry": "Yónnee bis",
+    "retrying": "Di yónnee…",
+    "delete": "Ñakk",
+    "confirmDelete": "Ñakk envois bii ? Mënuñu ko delloo.",
+    "statusPending": "Ci xaar",
+    "statusSending": "Di yónnee…",
+    "statusAuth": "Sa session jeex na — duggaatal",
+    "statusFailed": "Antuwul — dañu ko jéem bis",
+    "untitled": "(amul tur)",
+    "photos": "nataal yi",
+    "attempts": "{{count}} jéem",
+    "authExpired": "Sa session jeex na ci diggante envois bi.",
+    "updateAvailable": "Am na version bu bees ci Atlas. Loole leegi ?"
+  },
+  "install": {
+    "button": "Sampal application bi",
+    "ios": {
+      "button": "Sampal ci iPhone",
+      "title": "Sampal ci iPhone",
+      "step1": "Tegal ci butu Partager bi ci suuf.",
+      "step2": "Tànnal \"Ci écran d'accueil\".",
+      "step3": "Dëggal ak \"Ajouter\".",
+      "note": "Ubbil bii site ci Safari su nga gisul bii ci beneen application."
+    }
+  },
+  "webview": {
+    "title": "Ubbil bii lien ci sa navigateur",
+    "message": "Atlas dafa soxla benn navigateur bu wér (Chrome, Safari) ngir liggéey hors-ligne te sampal application bi. Bii application mënul denc sa envois su konekk dee.",
+    "copy": "Copier URL bi",
+    "copied": "URL copié na !"
+  },
+  "onboarding": {
+    "stepLabel": "Étape {{current}}/{{total}}",
+    "skip": "Ginnaaw",
+    "finish": "Nu ngi dem",
+    "menuEntry": "Guide enquêteur",
+    "welcome": {
+      "title": "Dalal jàmm ci Atlas",
+      "p1": "Sa jëfkaay yi denc nañu sax ci hors-ligne te yónnee leen su konekk delsi.",
+      "p2": "Bii guide bu gàttaagàtt dina la dimbali ngir defar sa appareil ci liggéeyu terrain."
+    },
+    "install": {
+      "title": "Sampal application bi",
+      "androidIntro": "Tegal ci butu bi ci suuf ngir sampal Atlas niki application ci sa telefon.",
+      "androidNote": "Su butu bi feeñul, sa navigateur baaxul — jëfandikool Chrome bu bees.",
+      "iosIntro": "Ci iPhone, dañu war sampal ci sa loxo :",
+      "webview": "Nekk nga ci application bu duggu (Facebook, Instagram, WhatsApp…). Ubbil bii lien ci benn navigateur bu wér laata sampal.",
+      "alreadyInstalled": "Atlas sampal na ci bii appareil ✅"
+    },
+    "geo": {
+      "title": "Maye autorisation ci géolocalisation",
+      "p1": "Atlas dafa jëfandikoo sa bërëb ngir def coordonnées ci jëfkaay yi nga bind.",
+      "p2": "Bu nga gisée \"Jëfandikoo sama bërëb\", mayal sa navigateur. Mën ngaa jéem leegi :",
+      "test": "Jéem géolocalisation",
+      "ok": "Géolocalisation jëkk na ✅",
+      "denied": "Géolocalisation refusé na. Mën ngaa ko mayal ci paramètres yu navigateur bi.",
+      "unsupported": "Géolocalisation bi amul ci bii appareil."
+    },
+    "offline": {
+      "title": "Liggéey hors-ligne",
+      "p1": "Ci bërëb amul reseaux, mën ngaa def te yónnee sa jëfkaay yi (ak nataal yi).",
+      "p2": "Am na bandeau bu orange \"Hors-ligne\" ci kaw, ak benn badge \"N ci xaar\" ci menu ngir xool envois yi xaar.",
+      "p3": "Su konekk delsi, yónnee bi mu ngi automatique. Mën ngaa yónnee ci sa loxo ci \"Sama envois yi ci xaar\"."
+    }
   },
   "actors": {
     "entreprise": "Bëti-goox",

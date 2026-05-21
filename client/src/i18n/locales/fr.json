@@ -40,7 +40,82 @@
     "error_generic": "Une erreur est survenue.",
     "submit_error": "Erreur lors de l'envoi",
     "access_denied_admin": "Accès réservé aux administrateurs.",
-    "load_error": "Erreur chargement"
+    "load_error": "Erreur chargement",
+    "next": "Suivant"
+  },
+  "offline": {
+    "banner": "Vous êtes hors ligne. Vos modifications seront envoyées au retour de la connexion.",
+    "savedLocally": "Initiative enregistrée localement. Elle sera envoyée automatiquement au retour de la connexion.",
+    "enqueueError": "Impossible d'enregistrer localement (stockage saturé ?).",
+    "pendingBadge": "{{count}} en attente",
+    "pendingBadgeTitle": "Envois en attente",
+    "pendingTitle": "Mes envois en attente",
+    "pendingHelp": "Ces initiatives sont enregistrées sur cet appareil et seront envoyées automatiquement au retour de la connexion. Vous pouvez aussi forcer le renvoi ou supprimer un envoi.",
+    "empty": "Aucun envoi en attente. Tout est synchronisé.",
+    "retry": "Renvoyer",
+    "retrying": "Envoi…",
+    "delete": "Supprimer",
+    "confirmDelete": "Supprimer cet envoi en attente ? Action irréversible.",
+    "statusPending": "En attente",
+    "statusSending": "En cours d'envoi…",
+    "statusAuth": "Session expirée — reconnectez-vous",
+    "statusFailed": "Échec — sera retenté",
+    "untitled": "(sans titre)",
+    "photos": "photo(s)",
+    "attempts": "{{count}} tentative(s)",
+    "authExpired": "Session expirée pendant l'envoi.",
+    "updateAvailable": "Une nouvelle version d'Atlas est disponible. Recharger maintenant ?"
+  },
+  "install": {
+    "button": "Installer l'app",
+    "ios": {
+      "button": "Installer sur iPhone",
+      "title": "Installer sur iPhone",
+      "step1": "Tapez sur le bouton Partager en bas (carré avec une flèche).",
+      "step2": "Faites défiler et choisissez \"Sur l'écran d'accueil\".",
+      "step3": "Confirmez avec \"Ajouter\".",
+      "note": "Ouvrez ce site dans Safari si vous voyez cette boîte dans une autre application."
+    }
+  },
+  "webview": {
+    "title": "Ouvrez ce lien dans votre navigateur",
+    "message": "Atlas Agroécologie a besoin d'un vrai navigateur (Chrome, Safari) pour fonctionner hors-ligne et installer l'application. L'app actuelle ne pourra pas enregistrer vos soumissions si le réseau coupe.",
+    "copy": "Copier l'URL",
+    "copied": "URL copiée !"
+  },
+  "onboarding": {
+    "stepLabel": "Étape {{current}}/{{total}}",
+    "skip": "Plus tard",
+    "finish": "C'est parti",
+    "menuEntry": "Guide enquêteur",
+    "welcome": {
+      "title": "Bienvenue dans Atlas",
+      "p1": "Vos initiatives sont enregistrées même hors-ligne et envoyées automatiquement au retour de la connexion.",
+      "p2": "Ce guide rapide vous aide à configurer votre appareil pour le travail terrain."
+    },
+    "install": {
+      "title": "Installer l'application",
+      "androidIntro": "Cliquez sur le bouton ci-dessous pour installer Atlas comme une application sur votre téléphone.",
+      "androidNote": "Si le bouton n'apparaît pas, votre navigateur n'est pas compatible — utilisez Chrome récent.",
+      "iosIntro": "Sur iPhone, l'installation est manuelle :",
+      "webview": "Vous êtes dans une application intégrée (Facebook, Instagram, WhatsApp…). Ouvrez ce lien dans un vrai navigateur (Chrome, Safari) avant d'installer.",
+      "alreadyInstalled": "Atlas est déjà installé sur cet appareil ✅"
+    },
+    "geo": {
+      "title": "Autoriser la géolocalisation",
+      "p1": "Atlas utilise votre position pour pré-remplir les coordonnées des initiatives que vous saisissez.",
+      "p2": "Au prochain \"Utiliser ma position\", autorisez votre navigateur. Vous pouvez tester maintenant :",
+      "test": "Tester la géolocalisation",
+      "ok": "Géolocalisation autorisée ✅",
+      "denied": "Géolocalisation refusée. Vous pouvez l'autoriser dans les paramètres du navigateur.",
+      "unsupported": "La géolocalisation n'est pas disponible sur cet appareil."
+    },
+    "offline": {
+      "title": "Travailler hors-ligne",
+      "p1": "En zone sans réseau, vous pouvez quand même remplir et soumettre vos initiatives (photos comprises).",
+      "p2": "Un bandeau orange \"Hors-ligne\" apparaît en haut, et un badge \"N en attente\" s'affiche dans le menu pour suivre les envois en attente.",
+      "p3": "Dès que la connexion revient, l'envoi est automatique. Vous pouvez aussi forcer un envoi depuis \"Mes envois en attente\"."
+    }
   },
   "actors": {
     "entreprise": "Entreprise",

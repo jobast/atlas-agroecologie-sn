@@ -23,10 +23,17 @@ import DytaelChooser from './components/DytaelChooser';
 import DytaelManager from './components/DytaelManager';
 import ProgrammeView from './components/ProgrammeView';
 import DytaesRoute from './components/DytaesRoute';
+import OfflineBanner from './components/OfflineBanner';
+import WebViewBanner from './components/WebViewBanner';
+import PendingSubmissions from './components/PendingSubmissions';
+import OnboardingTerrain from './components/OnboardingTerrain';
 
 function App() {
   return (
     <Router>
+      <WebViewBanner />
+      <OfflineBanner />
+      <OnboardingTerrain />
       <Routes>
         {/* Global auth routes (no slug prefix) */}
         <Route path="/login" element={
@@ -96,6 +103,11 @@ function App() {
           <Route path="my-initiatives" element={
             <ProtectedRoute>
               <MesInitiatives />
+            </ProtectedRoute>
+          } />
+          <Route path="mes-envois-en-attente" element={
+            <ProtectedRoute>
+              <PendingSubmissions />
             </ProtectedRoute>
           } />
           <Route path="programme/:id" element={<ProgrammeView />} />

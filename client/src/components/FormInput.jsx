@@ -11,6 +11,7 @@ import 'leaflet-geosearch/dist/geosearch.css';
 import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { useDytael } from '../context/DytaelContext';
 import { getTokenStatus } from '../utils/auth';
+import { enqueue as enqueueSubmission } from '../db/offlineQueue';
 
 const MAX_PHOTOS = 5;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5 Mo
@@ -425,6 +426,135 @@ export default function FormInput({ variant = 'default' }) {
     return errors;
   };
 
+  // Build a plain-object payload + a separated list of photo Files. The same
+  // shape feeds both the immediate POST (turned into FormData below) and the
+  // offline queue record (photos stored as Blobs in IndexedDB, payload kept
+  // serialisable via JSON.stringify).
+  const buildSerializablePayload = () => {
+    let effectiveLat = formData.lat;
+    let effectiveLon = formData.lon;
+    let effectiveVillage = formData.village;
+    let effectiveCommune = formData.commune;
+
+    if (formData.location_type === 'multi' && locations.length > 0) {
+      const primary = locations.find(l => l.is_primary) || locations[0];
+      effectiveLat = primary.lat;
+      effectiveLon = primary.lon;
+      effectiveVillage = primary.village || formData.village;
+      effectiveCommune = primary.commune || formData.commune;
+    }
+
+    const payload = {};
+    for (const key in formData) {
+      if (key === 'photos') continue;
+      if (key === 'social_media') {
+        payload[key] = JSON.stringify(formData.social_media);
+      } else if (key === 'lat') {
+        payload[key] = effectiveLat;
+      } else if (key === 'lon') {
+        payload[key] = effectiveLon;
+      } else if (key === 'village') {
+        payload[key] = effectiveVillage;
+      } else if (key === 'commune') {
+        payload[key] = effectiveCommune;
+      } else {
+        payload[key] = formData[key];
+      }
+    }
+
+    if (formData.location_type === 'multi') {
+      payload.locations = JSON.stringify(locations);
+    } else if (formData.location_type === 'point') {
+      payload.locations = JSON.stringify([{
+        label: 'Localisation principale',
+        lat: effectiveLat,
+        lon: effectiveLon,
+        village: effectiveVillage,
+        commune: effectiveCommune,
+        is_primary: true,
+      }]);
+    }
+
+    payload.geom = JSON.stringify({
+      type: 'Point',
+      coordinates: [parseFloat(effectiveLon), parseFloat(effectiveLat)],
+    });
+
+    payload.extra_fields = JSON.stringify(customValues);
+
+    if (parentIdFromUrl) payload.parent_id = parentIdFromUrl;
+    if (currentDytael?.id) payload.dytael_id = currentDytael.id;
+    if (entryType === 'programme') payload.location_type = 'zone';
+
+    return { payload, photos: formData.photos || [] };
+  };
+
+  const payloadToFormData = (payload, photos) => {
+    const data = new FormData();
+    for (const [key, value] of Object.entries(payload)) {
+      if (Array.isArray(value)) {
+        value.forEach(v => data.append(key, v));
+      } else if (value !== undefined && value !== null) {
+        data.append(key, value);
+      }
+    }
+    photos.forEach(file => data.append('photos', file));
+    return data;
+  };
+
+  const resetFormState = () => {
+    setFormData({
+      initiative: '', description: '', village: '', commune: '', zone_intervention: '',
+      actor_type: '', year: '', activities: [], lat: '', lon: '', location_type: 'point',
+      website: '', photos: [], contact_email: '', contact_phone: '', person_name: '',
+      videos: [], social_media: [],
+    });
+    setLocations([{ label: '', lat: '', lon: '', village: '', commune: '', is_primary: true }]);
+    setEditingLocIndex(null);
+    setVideoLinks(['']);
+    setSocialMedia([]);
+    setSocialLinks({});
+    setSameAsDeclarant(false);
+    setCustomValues({});
+    setGpsAccuracy(null);
+    setPhotoNotice('');
+  };
+
+  // Queue the current form for later transmission. Called when offline or
+  // when the POST throws a network-level error (no HTTP response).
+  const queueOffline = async () => {
+    const { payload, photos } = buildSerializablePayload();
+    // Convert File -> serialisable {name, type, blob} so IDB stores cleanly.
+    const photoRecords = await Promise.all(
+      photos.map(async (f) => ({
+        name: f.name,
+        type: f.type || 'image/jpeg',
+        blob: f.slice(0, f.size, f.type || 'image/jpeg'),
+      }))
+    );
+    await enqueueSubmission({
+      dytaelId: currentDytael?.id || null,
+      slug: slug || null,
+      parentId: parentIdFromUrl || null,
+      payload,
+      photos: photoRecords,
+    });
+    // Best-effort Background Sync registration; Chrome Android will drain
+    // even when the tab is closed. iOS Safari ignores this silently.
+    try {
+      if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        const reg = await navigator.serviceWorker.ready;
+        if (reg && reg.sync) await reg.sync.register('submit-queue');
+      }
+    } catch { /* not supported, that's fine */ }
+    clearDraft();
+    resetFormState();
+    alert(t('offline.savedLocally', {
+      defaultValue: 'Initiative enregistrée localement. Elle sera envoyée automatiquement au retour de la connexion.'
+    }));
+    navigate(`/${slug || 'national'}/mes-envois-en-attente`);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -439,82 +569,20 @@ export default function FormInput({ variant = 'default' }) {
     }
     setFormErrors([]);
 
-  const data = new FormData();
-
-  // For multi mode, sync primary location to flat fields
-  let effectiveLat = formData.lat;
-  let effectiveLon = formData.lon;
-  let effectiveVillage = formData.village;
-  let effectiveCommune = formData.commune;
-
-  if (formData.location_type === 'multi' && locations.length > 0) {
-    const primary = locations.find(l => l.is_primary) || locations[0];
-    effectiveLat = primary.lat;
-    effectiveLon = primary.lon;
-    effectiveVillage = primary.village || formData.village;
-    effectiveCommune = primary.commune || formData.commune;
-  }
-
-  for (const key in formData) {
-    if (key === 'photos') {
-      formData.photos.forEach((file) => data.append('photos', file));
-    } else if (key === 'activities') {
-      formData.activities.forEach((activity) => data.append('activities', activity));
-    } else if (key === 'videos') {
-      formData.videos.forEach((video) => data.append('videos', video));
-    } else if (key === 'social_media') {
-      data.append('social_media', JSON.stringify(formData.social_media));
-    } else if (key === 'lat') {
-      data.append('lat', effectiveLat);
-    } else if (key === 'lon') {
-      data.append('lon', effectiveLon);
-    } else if (key === 'village') {
-      data.append('village', effectiveVillage);
-    } else if (key === 'commune') {
-      data.append('commune', effectiveCommune);
-    } else {
-      data.append(key, formData[key]);
+  // Offline up front: don't even try the network, go straight to the queue.
+  // The user's data + photos persist in IndexedDB and replay on reconnection.
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    try {
+      await queueOffline();
+    } catch (e) {
+      console.error('Offline enqueue failed:', e);
+      setFormErrors([t('offline.enqueueError', { defaultValue: 'Impossible d\'enregistrer localement (stockage saturé ?).' })]);
     }
+    return;
   }
 
-  // Send locations array
-  if (formData.location_type === 'multi') {
-    data.append('locations', JSON.stringify(locations));
-  } else if (formData.location_type === 'point') {
-    // Create a single location entry for point mode
-    data.append('locations', JSON.stringify([{
-      label: 'Localisation principale',
-      lat: effectiveLat,
-      lon: effectiveLon,
-      village: effectiveVillage,
-      commune: effectiveCommune,
-      is_primary: true
-    }]));
-  }
-  // zone mode: no locations array needed
-
-  data.append('geom', JSON.stringify({
-    type: 'Point',
-    coordinates: [parseFloat(effectiveLon), parseFloat(effectiveLat)],
-  }));
-
-  data.append('extra_fields', JSON.stringify(customValues));
-
-  // Attach parent_id if creating a sub-initiative
-  if (parentIdFromUrl) {
-    data.append('parent_id', parentIdFromUrl);
-  }
-
-  // Tell the server which DyTAEL this submission belongs to (the page's slug,
-  // not the user's home DyTAEL) so it lands in the right validation queue.
-  if (currentDytael?.id) {
-    data.append('dytael_id', currentDytael.id);
-  }
-
-  // Force location_type to 'zone' for programmes (no GPS)
-  if (entryType === 'programme') {
-    data.set('location_type', 'zone');
-  }
+  const { payload, photos } = buildSerializablePayload();
+  const data = payloadToFormData(payload, photos);
 
   try {
     const token = localStorage.getItem('token');
@@ -545,37 +613,21 @@ export default function FormInput({ variant = 'default' }) {
     }
 
     alert(t('form.initiative_saved'));
-    setFormData({
-      initiative: '',
-      description: '',
-      village: '',
-      commune: '',
-      zone_intervention: '',
-      actor_type: '',
-      year: '',
-      activities: [],
-      lat: '',
-      lon: '',
-      location_type: 'point',
-      website: '',
-      photos: [],
-      contact_email: '',
-      contact_phone: '',
-      person_name: '',
-      videos: [],
-      social_media: [],
-    });
-    setLocations([{ label: '', lat: '', lon: '', village: '', commune: '', is_primary: true }]);
-    setEditingLocIndex(null);
-    setVideoLinks(['']);
-    setSocialMedia([]);
-    setSocialLinks({});
-    setSameAsDeclarant(false);
-    setCustomValues({});
-    setGpsAccuracy(null);
-    setPhotoNotice('');
+    resetFormState();
   } catch (error) {
     console.error("Erreur lors de la soumission :", error);
+    // Network blip (no HTTP response at all) → fall back to offline queue
+    // rather than asking the user to retype everything. Keeps mobile users
+    // safe from spotty connections that drop mid-upload.
+    if (!error.response && error.code !== 'ERR_BAD_REQUEST' && error.message !== t('form.token_missing')) {
+      try {
+        await queueOffline();
+        return;
+      } catch (qe) {
+        console.error('Offline enqueue fallback failed:', qe);
+        // fall through to normal error handling
+      }
+    }
     let message;
     const status = error.response?.status;
     const serverMsg = error.response?.data?.error;
