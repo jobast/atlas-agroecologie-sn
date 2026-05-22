@@ -3,15 +3,25 @@ import { useTranslation } from 'react-i18next';
 import InstallButton from './InstallButton';
 import { detectWebView } from '../utils/useWebView';
 
-// Bump the suffix when the onboarding flow changes meaningfully — every user
-// will see the new version once.
-export const ONBOARDING_FLAG = 'atlas:onboarded-v1';
+// Trigger contract: the wizard is NOT shown automatically. It opens only on
+// two explicit signals so the public never bumps into it accidentally:
+//   1) the URL carries ?onboarding=1 (a coordinator shares this link with
+//      their field agents - email, WhatsApp, QR code, etc.);
+//   2) the menu's "Guide enquêteur" entry dispatches ONBOARDING_REQUEST_EVENT.
+// When the URL param fires, we strip it via history.replaceState so a reload
+// doesn't keep re-opening the wizard.
 export const ONBOARDING_REQUEST_EVENT = 'atlas:show-onboarding';
+const ONBOARDING_URL_PARAM = 'onboarding';
 
 function isIos() {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent || '';
   return /iPad|iPhone|iPod/.test(ua);
+}
+
+function isChromeIos() {
+  if (typeof navigator === 'undefined') return false;
+  return /CriOS\//.test(navigator.userAgent || '');
 }
 
 function isStandalone() {
@@ -21,48 +31,35 @@ function isStandalone() {
   return false;
 }
 
-// 4-screen wizard explaining the offline-first mode to field surveyors. Shown
-// once after the first successful login (flag in localStorage), and always
-// re-accessible from the burger menu (which dispatches a custom event).
 export default function OnboardingTerrain() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const inWebView = detectWebView();
   const ios = isIos();
+  const chromeIos = isChromeIos();
   const standalone = isStandalone();
 
   useEffect(() => {
-    // Auto-open once after first login. We only mount it after we see a
-    // user object (i.e. login completed) to avoid greeting anonymous
-    // visitors on the landing page.
-    const checkAuto = () => {
-      try {
-        const user = localStorage.getItem('user');
-        const flagged = localStorage.getItem(ONBOARDING_FLAG);
-        if (user && !flagged) {
-          setStep(0);
-          setOpen(true);
-        }
-      } catch { /* ignore */ }
-    };
-    checkAuto();
-    const onAuthChange = () => checkAuto();
+    // 1) URL-triggered open: ?onboarding=1 (any value, presence is enough).
+    //    Consume the param so a reload doesn't re-fire the wizard.
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has(ONBOARDING_URL_PARAM)) {
+        url.searchParams.delete(ONBOARDING_URL_PARAM);
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : '') + url.hash);
+        setStep(0);
+        setOpen(true);
+      }
+    } catch { /* ignore - URL parsing should never throw on a live page */ }
+
+    // 2) Menu-triggered open.
     const onExplicit = () => { setStep(0); setOpen(true); };
-    window.addEventListener('auth-change', onAuthChange);
     window.addEventListener(ONBOARDING_REQUEST_EVENT, onExplicit);
-    return () => {
-      window.removeEventListener('auth-change', onAuthChange);
-      window.removeEventListener(ONBOARDING_REQUEST_EVENT, onExplicit);
-    };
+    return () => window.removeEventListener(ONBOARDING_REQUEST_EVENT, onExplicit);
   }, []);
 
-  const close = (markSeen = true) => {
-    if (markSeen) {
-      try { localStorage.setItem(ONBOARDING_FLAG, '1'); } catch { /* ignore */ }
-    }
-    setOpen(false);
-  };
+  const close = () => setOpen(false);
 
   const testGeolocation = () => {
     if (!('geolocation' in navigator)) {
@@ -119,6 +116,34 @@ export default function OnboardingTerrain() {
             <p className="text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
               {t('onboarding.install.alreadyInstalled', { defaultValue: 'Atlas est déjà installé sur cet appareil ✅' })}
             </p>
+          ) : chromeIos ? (
+            // Apple blocks PWA install on every iOS browser EXCEPT Safari -
+            // Chrome iOS, Firefox iOS, etc. are all WebKit wrappers without
+            // install rights. The only fix is to open the URL in Safari.
+            <>
+              <p className="text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                {t('onboarding.install.chromeIos', {
+                  defaultValue: 'Sur iPhone, l\'installation marche uniquement dans Safari. Chrome (et les autres navigateurs iPhone) ne peut pas installer d\'application — c\'est une restriction d\'Apple.',
+                })}
+              </p>
+              <p className="text-sm text-gray-700">
+                {t('onboarding.install.chromeIosHowto', {
+                  defaultValue: 'Copiez l\'URL ci-dessous puis collez-la dans Safari pour installer Atlas :',
+                })}
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(window.location.origin + '/');
+                    alert(t('webview.copied', { defaultValue: 'URL copiée !' }));
+                  } catch { /* ignore */ }
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+              >
+                {t('webview.copy', { defaultValue: 'Copier l\'URL' })}
+              </button>
+            </>
           ) : ios ? (
             <>
               <p>{t('onboarding.install.iosIntro', { defaultValue: 'Sur iPhone, l\'installation est manuelle :' })}</p>
@@ -185,7 +210,7 @@ export default function OnboardingTerrain() {
   const screen = screens[step];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4" onClick={() => close(true)}>
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4" onClick={() => close()}>
       <div
         className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl"
         onClick={e => e.stopPropagation()}
@@ -197,7 +222,7 @@ export default function OnboardingTerrain() {
             </span>
             <button
               type="button"
-              onClick={() => close(true)}
+              onClick={() => close()}
               aria-label={t('common.close', { defaultValue: 'Fermer' })}
               className="text-gray-400 hover:text-gray-600"
             >
@@ -230,7 +255,7 @@ export default function OnboardingTerrain() {
             ) : (
               <button
                 type="button"
-                onClick={() => close(true)}
+                onClick={() => close()}
                 className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2.5 rounded-lg text-sm font-medium"
               >
                 {t('onboarding.skip', { defaultValue: 'Plus tard' })}
@@ -247,7 +272,7 @@ export default function OnboardingTerrain() {
             ) : (
               <button
                 type="button"
-                onClick={() => close(true)}
+                onClick={() => close()}
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium"
               >
                 {t('onboarding.finish', { defaultValue: 'C\'est parti' })}

@@ -23,11 +23,27 @@ function isIos() {
   return /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
 }
 
+// Apple only allows the install gesture in Safari. Chrome iOS, Firefox iOS,
+// etc. are WebKit wrappers without install capability — clicking "Install"
+// in them does nothing, so detect and route them to a "use Safari" hint.
+function isChromeIos() {
+  if (typeof navigator === 'undefined') return false;
+  return /CriOS\//.test(navigator.userAgent || '');
+}
+function isNonSafariIos() {
+  if (!isIos()) return false;
+  const ua = navigator.userAgent || '';
+  // Safari itself does NOT contain CriOS/FxiOS/EdgiOS.
+  return /CriOS\/|FxiOS\/|EdgiOS\/|OPiOS\//.test(ua);
+}
+
 export default function InstallButton({ className = '' }) {
   const { t } = useTranslation();
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showIosHowto, setShowIosHowto] = useState(false);
+  const [showChromeIosHint, setShowChromeIosHint] = useState(false);
   const standalone = isStandalone();
+  const nonSafariIos = isNonSafariIos();
 
   useEffect(() => {
     const onBeforeInstallPrompt = (e) => {
@@ -52,6 +68,10 @@ export default function InstallButton({ className = '' }) {
         await deferredPrompt.userChoice;
       } catch { /* ignore */ }
       setDeferredPrompt(null);
+      return;
+    }
+    if (nonSafariIos) {
+      setShowChromeIosHint(true);
       return;
     }
     if (isIos()) {
@@ -79,6 +99,40 @@ export default function InstallButton({ className = '' }) {
           ? t('install.button', { defaultValue: 'Installer l\'app' })
           : t('install.ios.button', { defaultValue: 'Installer sur iPhone' })}
       </button>
+
+      {showChromeIosHint && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4" onClick={() => setShowChromeIosHint(false)}>
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">
+              {t('install.chromeIos.title', { defaultValue: 'Installation impossible dans ce navigateur' })}
+            </h3>
+            <p className="text-sm text-gray-700 mb-3">
+              {t('install.chromeIos.body', {
+                defaultValue: 'Sur iPhone, Apple n\'autorise l\'installation que dans Safari. Copiez l\'URL ci-dessous, puis collez-la dans Safari pour installer Atlas.',
+              })}
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(window.location.origin + '/');
+                  alert(t('webview.copied', { defaultValue: 'URL copiée !' }));
+                } catch { /* ignore */ }
+              }}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+            >
+              {t('webview.copy', { defaultValue: 'Copier l\'URL' })}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowChromeIosHint(false)}
+              className="mt-2 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
+            >
+              {t('common.close', { defaultValue: 'Fermer' })}
+            </button>
+          </div>
+        </div>
+      )}
 
       {showIosHowto && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4" onClick={() => setShowIosHowto(false)}>

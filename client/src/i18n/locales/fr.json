@@ -75,6 +75,10 @@
       "step2": "Faites défiler et choisissez \"Sur l'écran d'accueil\".",
       "step3": "Confirmez avec \"Ajouter\".",
       "note": "Ouvrez ce site dans Safari si vous voyez cette boîte dans une autre application."
+    },
+    "chromeIos": {
+      "title": "Installation impossible dans ce navigateur",
+      "body": "Sur iPhone, Apple n'autorise l'installation que dans Safari. Copiez l'URL ci-dessous, puis collez-la dans Safari pour installer Atlas."
     }
   },
   "webview": {
@@ -98,6 +102,8 @@
       "androidIntro": "Cliquez sur le bouton ci-dessous pour installer Atlas comme une application sur votre téléphone.",
       "androidNote": "Si le bouton n'apparaît pas, votre navigateur n'est pas compatible — utilisez Chrome récent.",
       "iosIntro": "Sur iPhone, l'installation est manuelle :",
+      "chromeIos": "Sur iPhone, l'installation marche uniquement dans Safari. Chrome (et les autres navigateurs iPhone) ne peut pas installer d'application — c'est une restriction d'Apple.",
+      "chromeIosHowto": "Copiez l'URL ci-dessous puis collez-la dans Safari pour installer Atlas :",
       "webview": "Vous êtes dans une application intégrée (Facebook, Instagram, WhatsApp…). Ouvrez ce lien dans un vrai navigateur (Chrome, Safari) avant d'installer.",
       "alreadyInstalled": "Atlas est déjà installé sur cet appareil ✅"
     },

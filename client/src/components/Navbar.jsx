@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import InstallButton from './InstallButton';
 import { count as pendingCount, QUEUE_CHANGED_EVENT } from '../db/offlineQueue';
-import { ONBOARDING_FLAG, ONBOARDING_REQUEST_EVENT } from './OnboardingTerrain';
+import { ONBOARDING_REQUEST_EVENT } from './OnboardingTerrain';
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -84,7 +84,6 @@ export default function Navbar() {
 
   const openOnboarding = () => {
     setMenuOpen(false);
-    try { localStorage.removeItem(ONBOARDING_FLAG); } catch { /* ignore */ }
     window.dispatchEvent(new Event(ONBOARDING_REQUEST_EVENT));
   };
 

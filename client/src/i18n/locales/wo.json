@@ -75,6 +75,10 @@
       "step2": "Tànnal \"Ci écran d'accueil\".",
       "step3": "Dëggal ak \"Ajouter\".",
       "note": "Ubbil bii site ci Safari su nga gisul bii ci beneen application."
+    },
+    "chromeIos": {
+      "title": "Mënuñu sampal ci bii navigateur",
+      "body": "Ci iPhone, Apple may na sampal ci Safari rekk. Copier URL bi, sés ko ci Safari ngir sampal Atlas."
     }
   },
   "webview": {
@@ -98,6 +102,8 @@
       "androidIntro": "Tegal ci butu bi ci suuf ngir sampal Atlas niki application ci sa telefon.",
       "androidNote": "Su butu bi feeñul, sa navigateur baaxul — jëfandikool Chrome bu bees.",
       "iosIntro": "Ci iPhone, dañu war sampal ci sa loxo :",
+      "chromeIos": "Ci iPhone, sampal bi mën na rekk ci Safari. Chrome (ak yeneen navigateur iPhone) mënul sampal application — Apple bañ na ko.",
+      "chromeIosHowto": "Copier URL bi, sés ko ci Safari ngir sampal Atlas :",
       "webview": "Nekk nga ci application bu duggu (Facebook, Instagram, WhatsApp…). Ubbil bii lien ci benn navigateur bu wér laata sampal.",
       "alreadyInstalled": "Atlas sampal na ci bii appareil ✅"
     },
